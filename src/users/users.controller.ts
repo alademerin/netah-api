@@ -5,7 +5,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { ResponseMessage } from 'src/response/response.decorator';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 
-  @UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard)
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
