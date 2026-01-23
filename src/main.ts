@@ -6,6 +6,7 @@ import * as cookieParser from 'cookie-parser';
 import { ResponseInterceptor } from './response/response.interceptor';
 
 async function bootstrap() {
+  console.log('FEL', process.env.FRONTEND_URL)
   const app = await NestFactory.create(AppModule);
 
   app.useLogger(new Logger());
@@ -38,7 +39,7 @@ async function bootstrap() {
     .setTitle('NETAH API')
     .setDescription('API documentation for NETAH app')
     .setVersion('1.0')
-    .addCookieAuth('access_token') 
+    .addCookieAuth('access_token')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

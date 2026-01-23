@@ -5,6 +5,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { Response } from 'express';
 import { CreateUserDto } from 'src/users/dto/create-user.dto';
+import { User } from 'src/users/entities/user.entity';
 
 @Injectable()
 export class AuthService {
@@ -36,7 +37,9 @@ export class AuthService {
   }
 
   async register(signupDto: CreateUserDto, res: Response) {
-    const existingEmail = await this.usersService.findOneByEmailWithPassword(signupDto.email);
+    const existingEmail = await this.usersService.findOneByEmailWithPassword(
+      signupDto.email
+    );
     const existingPhone = await this.usersService.findOneByPhoneNumber(signupDto.phoneNumber);
 
     if (existingEmail || existingPhone)
@@ -59,5 +62,10 @@ export class AuthService {
       sameSite: 'lax', // or 'none' if cross-site
       maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
     });
+  }
+
+  async getMe(user: User) {
+    const authenticatedUser = await this.usersService.findOne(user?.id);
+    return authenticatedUser;
   }
 }
