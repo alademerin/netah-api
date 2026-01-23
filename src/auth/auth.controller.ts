@@ -14,13 +14,19 @@ export class AuthController {
 
   @ResponseMessage('Login successful!')
   @Post('login')
-  login(@Body() createAuthDto: CreateAuthDto, @Res({ passthrough: true }) res: Response) {
+  login(
+    @Body() createAuthDto: CreateAuthDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     return this.authService.login(createAuthDto, res);
   }
 
   @ResponseMessage('Sign up successful!')
   @Post('register')
-  register(@Body() signUpDto: CreateUserDto, @Res({ passthrough: true }) res: Response) {
+  register(
+    @Body() signUpDto: CreateUserDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     return this.authService.register(signUpDto, res);
   }
 

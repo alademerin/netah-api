@@ -1,12 +1,16 @@
 import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { ClassSerializerInterceptor, Logger, ValidationPipe } from '@nestjs/common';
+import {
+  ClassSerializerInterceptor,
+  Logger,
+  ValidationPipe,
+} from '@nestjs/common';
 import * as cookieParser from 'cookie-parser';
 import { ResponseInterceptor } from './response/response.interceptor';
 
 async function bootstrap() {
-  console.log('FEL', process.env.FRONTEND_URL)
+  console.log('FEL', process.env.FRONTEND_URL);
   const app = await NestFactory.create(AppModule);
 
   app.useLogger(new Logger());

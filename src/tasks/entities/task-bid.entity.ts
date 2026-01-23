@@ -1,4 +1,12 @@
-import { Entity, Enum, Filter, ManyToOne, PrimaryKey, Property, Unique } from '@mikro-orm/core';
+import {
+  Entity,
+  Enum,
+  Filter,
+  ManyToOne,
+  PrimaryKey,
+  Property,
+  Unique,
+} from '@mikro-orm/core';
 import { User } from 'src/users/entities/user.entity';
 import { Task } from './task.entity';
 import { TaskBidStatus } from '../dto/create-task-bid.dto';

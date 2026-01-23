@@ -4,7 +4,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { CreateTaskDto, TaskStatusEnum, TaskUrgencyEnum } from './dto/create-task.dto';
+import {
+  CreateTaskDto,
+  TaskStatusEnum,
+  TaskUrgencyEnum,
+} from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { CreateTaskCategoryDto } from './dto/create-task-category.dto';
 import { InjectRepository } from '@mikro-orm/nestjs';
@@ -34,7 +38,9 @@ export class TasksService {
   ) {}
 
   async create(createTaskDto: CreateTaskDto, currentUser: User) {
-    const category = await this.taskCategoryRepo.findOne(createTaskDto?.categoryId);
+    const category = await this.taskCategoryRepo.findOne(
+      createTaskDto?.categoryId,
+    );
 
     if (!category) {
       throw new NotFoundException('Task category not found');
@@ -99,7 +105,9 @@ export class TasksService {
     });
 
     if (existingCategory) {
-      throw new ConflictException(`Category with name ${normalizedName} already exists`);
+      throw new ConflictException(
+        `Category with name ${normalizedName} already exists`,
+      );
     }
     const taskCategory = this.taskCategoryRepo.create({
       ...createTaskCategoryDto,
@@ -121,7 +129,11 @@ export class TasksService {
     await this.em.flush();
   }
 
-  async createBid(id: string, createTaskBidDto: CreateTaskBidDto, currentUser: User) {
+  async createBid(
+    id: string,
+    createTaskBidDto: CreateTaskBidDto,
+    currentUser: User,
+  ) {
     const task = await this.taskRepo.findOneOrFail({
       publicId: id,
       status: TaskStatusEnum.OPEN,
@@ -138,7 +150,9 @@ export class TasksService {
     });
 
     if (existingBid) {
-      throw new BadRequestException('You already have an active bid on this task');
+      throw new BadRequestException(
+        'You already have an active bid on this task',
+      );
     }
 
     const taskBid = this.taskBidRepo.create({

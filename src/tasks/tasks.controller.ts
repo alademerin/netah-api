@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+} from '@nestjs/common';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
@@ -16,7 +25,10 @@ export class TasksController {
   @ResponseMessage('Task posted successfully!')
   @UseGuards(JwtAuthGuard)
   @Post()
-  create(@Body() createTaskDto: CreateTaskDto, @CurrentUser() currentUser: User) {
+  create(
+    @Body() createTaskDto: CreateTaskDto,
+    @CurrentUser() currentUser: User,
+  ) {
     return this.tasksService.create(createTaskDto, currentUser);
   }
 
