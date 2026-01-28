@@ -169,7 +169,7 @@ export class TasksService {
       throw new BadRequestException('You cannot bid on your own tasks');
     }
 
-    const taskBid = await this.taskBidRepo.findOneOrFail({
+    const taskBid = await this.taskBidRepo.findOne({
       task,
       createdBy: currentUser?.id,
     });
