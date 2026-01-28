@@ -29,7 +29,7 @@ export class AuthService {
     const token = this.jwtService.sign(payload);
 
     res.cookie('access_token', token, {
-      httpOnly: true,
+      httpOnly: false,
       secure: false,
       sameSite: 'none', // or 'none' if cross-site
       maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
@@ -55,7 +55,7 @@ export class AuthService {
     const token = this.jwtService.sign(payload);
 
     res.cookie('access_token', token, {
-      httpOnly: true,
+      httpOnly: false,
       secure: false,
       sameSite: 'none', // or 'none' if cross-site
       maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
