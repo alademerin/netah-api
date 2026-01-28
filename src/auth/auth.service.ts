@@ -27,11 +27,12 @@ export class AuthService {
     };
 
     const token = this.jwtService.sign(payload);
+    const isProd = process.env.NODE_ENV === 'production';
 
     res.cookie('access_token', token, {
       httpOnly: false,
-      secure: true,
-      sameSite: 'none',
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
       maxAge: 1000 * 60 * 60 * 24 * 7,
     });
   }
@@ -53,11 +54,12 @@ export class AuthService {
     };
 
     const token = this.jwtService.sign(payload);
+    const isProd = process.env.NODE_ENV === 'production';
 
     res.cookie('access_token', token, {
       httpOnly: false,
-      secure: true,
-      sameSite: 'none',
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
       maxAge: 1000 * 60 * 60 * 24 * 7,
     });
   }
