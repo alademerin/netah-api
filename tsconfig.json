@@ -16,7 +16,7 @@
     "noImplicitAny": false,
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false,
-      "baseUrl": "./src",
+    "baseUrl": "./src",
     "paths": {
       "src/*": ["*"]
     }
