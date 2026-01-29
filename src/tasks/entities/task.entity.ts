@@ -1,8 +1,10 @@
 import {
+  Collection,
   Entity,
   Enum,
   Filter,
   ManyToOne,
+  OneToMany,
   PrimaryKey,
   Property,
 } from '@mikro-orm/core';
@@ -11,6 +13,7 @@ import { TaskCategory } from './task-category.entity';
 import { User } from 'src/users/entities/user.entity';
 import { Exclude } from 'class-transformer';
 import { v4 as uuidv4 } from 'uuid';
+import { TaskBid } from './task-bid.entity';
 
 @Entity()
 @Filter({
@@ -64,4 +67,5 @@ export class Task {
 
   @Property({ nullable: true })
   deletedAt?: Date;
+
 }

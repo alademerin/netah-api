@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+} from '@nestjs/common';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
@@ -16,7 +25,10 @@ export class TasksController {
   @ResponseMessage('Task posted successfully!')
   @UseGuards(JwtAuthGuard)
   @Post()
-  create(@Body() createTaskDto: CreateTaskDto, @CurrentUser() currentUser: User) {
+  create(
+    @Body() createTaskDto: CreateTaskDto,
+    @CurrentUser() currentUser: User,
+  ) {
     return this.tasksService.create(createTaskDto, currentUser);
   }
 
@@ -29,6 +41,13 @@ export class TasksController {
   @Get('category')
   finaAllCategories() {
     return this.tasksService.findAllCategories();
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ResponseMessage('Tasks by logged in user retrieved successfully!')
+  @Get('me')
+  findMyTasks(@CurrentUser() currentUser: User) {
+    return this.tasksService.findMyTasks(currentUser);
   }
 
   @Delete('category/:id')

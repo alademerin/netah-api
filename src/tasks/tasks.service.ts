@@ -15,6 +15,7 @@ import { User } from 'src/users/entities/user.entity';
 import { CreateTaskBidDto, TaskBidStatus } from './dto/create-task-bid.dto';
 import { TaskBid } from './entities/task-bid.entity';
 import { NotFoundError } from 'rxjs';
+import { MyTaskResponseDto } from './dto/my-task.response.dto';
 
 @Injectable()
 export class TasksService {
@@ -40,7 +41,6 @@ export class TasksService {
     });
 
     if (!category) {
-      console.log('reached');
       throw new NotFoundException('Task category not found');
     }
 
@@ -179,5 +179,33 @@ export class TasksService {
     }
 
     return taskBid;
+  }
+
+  async findMyTasks(currentUser: User): Promise<MyTaskResponseDto[]> {
+    const tasks = await this.taskRepo.find(
+      { postedBy: currentUser },
+      { populate: ['category', 'assignedTo', 'postedBy'] },
+    );
+
+    const tasksWithBidCount: MyTaskResponseDto[] = await Promise.all(
+      tasks.map(async (task) => {
+        const bidCount = await this.taskBidRepo.count({ task });
+
+        return {
+          id: task.id,
+          publicId: task.publicId,
+          title: task.title,
+          description: task.description,
+          location: task.location,
+          reward: task.reward,
+          urgency: task.urgency,
+          status: task.status,
+          createdAt: task.createdAt,
+          bidCount,
+        };
+      }),
+    );
+
+    return tasksWithBidCount;
   }
 }

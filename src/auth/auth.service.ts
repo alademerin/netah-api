@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { CreateAuthDto } from './dto/create-auth.dto';
 import { UsersService } from 'src/users/users.service';
 import { JwtService } from '@nestjs/jwt';
@@ -15,10 +19,15 @@ export class AuthService {
   ) {}
 
   async login(createAuthDto: CreateAuthDto, res: Response) {
-    const user = await this.usersService.findOneByEmailWithPassword(createAuthDto.email);
+    const user = await this.usersService.findOneByEmailWithPassword(
+      createAuthDto.email,
+    );
     if (!user) throw new UnauthorizedException('Invalid Credentials');
 
-    const passwordMatch = await bcrypt.compare(createAuthDto.password, user.password);
+    const passwordMatch = await bcrypt.compare(
+      createAuthDto.password,
+      user.password,
+    );
     if (!passwordMatch) throw new UnauthorizedException('Invalid Credentials');
 
     const payload = {
@@ -38,8 +47,12 @@ export class AuthService {
   }
 
   async register(signupDto: CreateUserDto, res: Response) {
-    const existingEmail = await this.usersService.findOneByEmailWithPassword(signupDto.email);
-    const existingPhone = await this.usersService.findOneByPhoneNumber(signupDto.phoneNumber);
+    const existingEmail = await this.usersService.findOneByEmailWithPassword(
+      signupDto.email,
+    );
+    const existingPhone = await this.usersService.findOneByPhoneNumber(
+      signupDto.phoneNumber,
+    );
 
     if (existingEmail || existingPhone)
       throw new ConflictException(

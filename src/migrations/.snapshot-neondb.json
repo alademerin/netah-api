@@ -359,6 +359,16 @@
           "nullable": true,
           "length": 6,
           "mappedType": "datetime"
+        },
+        "bids_count": {
+          "name": "bids_count",
+          "type": "int",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "default": "0",
+          "mappedType": "integer"
         }
       },
       "name": "task",
