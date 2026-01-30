@@ -1,13 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
@@ -25,10 +16,7 @@ export class TasksController {
   @ResponseMessage('Task posted successfully!')
   @UseGuards(JwtAuthGuard)
   @Post()
-  create(
-    @Body() createTaskDto: CreateTaskDto,
-    @CurrentUser() currentUser: User,
-  ) {
+  create(@Body() createTaskDto: CreateTaskDto, @CurrentUser() currentUser: User) {
     return this.tasksService.create(createTaskDto, currentUser);
   }
 
@@ -56,8 +44,8 @@ export class TasksController {
   }
 
   @Get(':id')
-  findOneByUuid(@Param('id') id: string, @CurrentUser() currentUser: User) {
-    return this.tasksService.findOneByUuid(id, currentUser);
+  findOneByUuid(@Param('id') id: string ) {
+    return this.tasksService.findOneByUuid(id);
   }
 
   @Patch(':id')
@@ -91,8 +79,15 @@ export class TasksController {
 
   @UseGuards(JwtAuthGuard)
   @ResponseMessage('Task bid gotten successfully!')
-  @Get(':id/bids')
+  @Get(':id/bid')
   getUserBid(@Param('id') id: string, @CurrentUser() currentUser: User) {
     return this.tasksService.getUserBid(id, currentUser);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ResponseMessage('Task bid gotten successfully!')
+  @Get(':id/bids')
+  getTaskBids(@Param('id') id: string, @CurrentUser() currentUser: User) {
+    return this.tasksService.getTaskBids(id, currentUser);
   }
 }

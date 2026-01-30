@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { CreateTaskDto, TaskStatusEnum, TaskUrgencyEnum } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
@@ -72,12 +73,12 @@ export class TasksService {
     });
   }
 
-  async findOne(id: number, currentUser) {
+  async findOne(id: number) {
     const task = await this.taskRepo.findOne({ id });
     return task;
   }
 
-  async findOneByUuid(publicId: string, currentUser) {
+  async findOneByUuid(publicId: string) {
     const task = await this.taskRepo.findOne(
       { publicId },
       {
@@ -179,6 +180,26 @@ export class TasksService {
     }
 
     return taskBid;
+  }
+
+  async getTaskBids(publicId: string, currentUser: User) {
+    const task = await this.taskRepo.findOne({
+      publicId,
+    });
+
+    if (!task) {
+      throw new NotFoundError('Task not found');
+    }
+
+    if (task?.postedBy?.id !== currentUser?.id)
+      throw new UnauthorizedException('You cannot view other bids');
+
+    const taskBids = await this.taskBidRepo.find({
+      task,
+      
+    },{populate:['createdBy']});
+
+    return taskBids;
   }
 
   async findMyTasks(currentUser: User): Promise<MyTaskResponseDto[]> {
