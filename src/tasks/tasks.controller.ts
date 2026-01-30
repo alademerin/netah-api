@@ -44,13 +44,18 @@ export class TasksController {
   }
 
   @Get(':id')
-  findOneByUuid(@Param('id') id: string ) {
+  findOneByUuid(@Param('id') id: string) {
     return this.tasksService.findOneByUuid(id);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateTaskDto: UpdateTaskDto) {
-    return this.tasksService.update(+id, updateTaskDto);
+  update(
+    @Param('id') id: string,
+    @Body() updateTaskDto: UpdateTaskDto,
+    @CurrentUser() currentUser: User,
+  ) {
+    return this.tasksService.update(id, updateTaskDto, currentUser);
   }
 
   @UseGuards(JwtAuthGuard)

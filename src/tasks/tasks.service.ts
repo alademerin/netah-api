@@ -88,8 +88,15 @@ export class TasksService {
     return task;
   }
 
-  update(id: number, updateTaskDto: UpdateTaskDto) {
-    return `This action updates a #${id} task`;
+  async update(id: string, updateTaskDto: UpdateTaskDto, currentUser: User) {
+    const task = await this.taskRepo.findOne({ publicId: id });
+    if (task?.postedBy?.id !== currentUser?.id) {
+      throw new UnauthorizedException();
+    }
+    if (!task) throw new NotFoundException('Task not found');
+    this.taskRepo.assign(task, updateTaskDto);
+    await this.em.flush();
+    return task;
   }
 
   remove(id: number) {
@@ -194,10 +201,12 @@ export class TasksService {
     if (task?.postedBy?.id !== currentUser?.id)
       throw new UnauthorizedException('You cannot view other bids');
 
-    const taskBids = await this.taskBidRepo.find({
-      task,
-      
-    },{populate:['createdBy']});
+    const taskBids = await this.taskBidRepo.find(
+      {
+        task,
+      },
+      { populate: ['createdBy'] },
+    );
 
     return taskBids;
   }
