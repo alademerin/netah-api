@@ -3,6 +3,8 @@ import { IsNotEmpty, IsNumber, IsString } from 'class-validator';
 
 export enum TaskBidStatus {
   PENDING = 'PENDING',
+  COUNTERED_BY_CLIENT = 'COUNTERED_BY_CLIENT',
+  COUNTERED_BY_RUNNER = 'COUNTERED_BY_RUNNER',
   ACCEPTED = 'ACCEPTED',
   REJECTED = 'REJECTED',
 }

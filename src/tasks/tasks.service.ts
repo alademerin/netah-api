@@ -17,6 +17,8 @@ import { CreateTaskBidDto, TaskBidStatus } from './dto/create-task-bid.dto';
 import { TaskBid } from './entities/task-bid.entity';
 import { NotFoundError } from 'rxjs';
 import { MyTaskResponseDto } from './dto/my-task.response.dto';
+import { CounterTaskBidDto } from './dto/counter-task-bid.dto';
+import { NegotiationRole, TaskBidNegotiation } from './entities/task-bid-negotiation.entity';
 
 @Injectable()
 export class TasksService {
@@ -29,6 +31,9 @@ export class TasksService {
 
     @InjectRepository(TaskBid)
     private readonly taskBidRepo: EntityRepository<TaskBid>,
+
+    @InjectRepository(TaskBidNegotiation)
+    private readonly taskBidNegotiationRepo: EntityRepository<TaskBidNegotiation>,
 
     @InjectRepository(User)
     private readonly userRepo: EntityRepository<User>,
@@ -162,6 +167,16 @@ export class TasksService {
     });
 
     await this.em.persistAndFlush(taskBid);
+
+    const bidHistory = this.taskBidNegotiationRepo.create({
+      taskBid,
+      amount: createTaskBidDto.amount,
+      message: createTaskBidDto.message,
+      createdBy: currentUser,
+      role: NegotiationRole.RUNNER,
+    });
+
+    await this.em.persistAndFlush(bidHistory);
     return taskBid;
   }
 
@@ -214,7 +229,7 @@ export class TasksService {
   async findMyTasks(currentUser: User): Promise<MyTaskResponseDto[]> {
     const tasks = await this.taskRepo.find(
       { postedBy: currentUser },
-      { populate: ['category', 'assignedTo', 'postedBy'] },
+      { populate: ['category', 'assignedTo', 'postedBy'], },
     );
 
     const tasksWithBidCount: MyTaskResponseDto[] = await Promise.all(
@@ -237,5 +252,120 @@ export class TasksService {
     );
 
     return tasksWithBidCount;
+  }
+
+  async counterTaskBid(
+    publicId: string,
+    bidId: string,
+    counterTaskBidDto: CounterTaskBidDto,
+    currentUser: User,
+  ) {
+    const task = await this.taskRepo.findOne({
+      publicId,
+    });
+
+    if (!task) {
+      throw new NotFoundException('Task not found');
+    }
+
+    const parsedBidId = Number(bidId);
+    if (!Number.isInteger(parsedBidId) || parsedBidId <= 0) {
+      throw new BadRequestException('Invalid bid id');
+    }
+
+    const isTaskPoster = task?.postedBy?.id === currentUser?.id;
+
+    const taskBid = await this.taskBidRepo.findOne(
+      {
+        id: parsedBidId,
+        task,
+      },
+      { populate: ['createdBy'] },
+    );
+
+    if (!taskBid) {
+      throw new NotFoundException('Task bid not found');
+    }
+
+    if ([TaskBidStatus.ACCEPTED, TaskBidStatus.REJECTED].includes(taskBid.status)) {
+      throw new BadRequestException('You cannot counterbid on a closed bid');
+    }
+
+    if (!isTaskPoster && taskBid.createdBy.id !== currentUser.id) {
+      throw new UnauthorizedException('You are not allowed to counter this bid');
+    }
+
+    taskBid.amount = counterTaskBidDto.amount;
+    taskBid.message = counterTaskBidDto.message ?? taskBid.message;
+    taskBid.status = isTaskPoster ? TaskBidStatus.COUNTERED_BY_CLIENT : TaskBidStatus.COUNTERED_BY_RUNNER;
+
+    const bidHistory = this.taskBidNegotiationRepo.create({
+      taskBid,
+      amount: counterTaskBidDto.amount,
+      message: counterTaskBidDto.message,
+      createdBy: currentUser,
+      role: isTaskPoster ? NegotiationRole.CLIENT : NegotiationRole.RUNNER,
+    });
+
+    await this.em.persistAndFlush([taskBid, bidHistory]);
+    return taskBid;
+  }
+
+  async getTaskBidHistory(publicId: string, bidId: string, currentUser: User) {
+    const task = await this.taskRepo.findOne({
+      publicId,
+    });
+
+    if (!task) {
+      throw new NotFoundException('Task not found');
+    }
+
+    const parsedBidId = Number(bidId);
+    if (!Number.isInteger(parsedBidId) || parsedBidId <= 0) {
+      throw new BadRequestException('Invalid bid id');
+    }
+
+    const isTaskPoster = task?.postedBy?.id === currentUser?.id;
+
+    const taskBid = await this.taskBidRepo.findOne(
+      {
+        id: parsedBidId,
+        task,
+      },
+      { populate: ['task', 'createdBy'] },
+    );
+
+    if (!taskBid) {
+      throw new NotFoundException('Task bid not found');
+    }
+
+    if (!isTaskPoster && taskBid.createdBy.id !== currentUser.id) {
+      throw new UnauthorizedException('You are not allowed to view this bid history');
+    }
+
+    const bidHistory = await this.taskBidNegotiationRepo.find(
+      { taskBid },
+      {
+        orderBy: { createdAt: 'ASC' },
+        populate: ['createdBy'],
+      },
+    );
+
+    return {
+      bid: taskBid,
+      negotiations: bidHistory.map((negotiation) => ({
+        id: negotiation.id,
+        amount: negotiation.amount,
+        message: negotiation.message,
+        role: negotiation.role,
+        createdAt: negotiation.createdAt,
+        createdBy: {
+          id: negotiation.createdBy.id,
+          firstName: negotiation.createdBy.firstName,
+          lastName: negotiation.createdBy.lastName,
+          email: negotiation.createdBy.email,
+        },
+      })),
+    };
   }
 }

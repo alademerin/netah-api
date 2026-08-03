@@ -6,9 +6,10 @@ import { TaskCategory } from './entities/task-category.entity';
 import { Task } from './entities/task.entity';
 import { User } from 'src/users/entities/user.entity';
 import { TaskBid } from './entities/task-bid.entity';
+import { TaskBidNegotiation } from './entities/task-bid-negotiation.entity';
 
 @Module({
-  imports: [MikroOrmModule.forFeature([TaskCategory, Task, TaskBid, User])],
+  imports: [MikroOrmModule.forFeature([TaskCategory, Task, TaskBid, TaskBidNegotiation, User])],
   controllers: [TasksController],
   providers: [TasksService],
 })

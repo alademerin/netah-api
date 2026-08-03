@@ -5,6 +5,7 @@ import {
   Filter,
   ManyToOne,
   OneToMany,
+  Opt,
   PrimaryKey,
   Property,
 } from '@mikro-orm/core';
@@ -46,6 +47,9 @@ export class Task {
 
   @Enum(() => TaskStatusEnum)
   status: TaskStatusEnum = TaskStatusEnum.OPEN;
+
+  @Property({ default: 0 })
+bidsCount: number & Opt = 0;
 
   @Property({ type: 'json', nullable: true })
   requirements?: string[];

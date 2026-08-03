@@ -8,6 +8,7 @@ import { CurrentUser } from 'src/auth/decorators/current-user-decorator';
 import { User } from 'src/users/entities/user.entity';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { CreateTaskBidDto } from './dto/create-task-bid.dto';
+import { CounterTaskBidDto } from './dto/counter-task-bid.dto';
 
 @Controller('tasks')
 export class TasksController {
@@ -49,6 +50,7 @@ export class TasksController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @ResponseMessage('Task updated successfully!')
   @Patch(':id')
   update(
     @Param('id') id: string,
@@ -94,5 +96,28 @@ export class TasksController {
   @Get(':id/bids')
   getTaskBids(@Param('id') id: string, @CurrentUser() currentUser: User) {
     return this.tasksService.getTaskBids(id, currentUser);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ResponseMessage('Task bid countered successfully!')
+  @Post(':id/bids/:bidId/counter')
+  counterTaskBid(
+    @Param('id') id: string,
+    @Param('bidId') bidId: string,
+    @Body() counterTaskBidDto: CounterTaskBidDto,
+    @CurrentUser() currentUser: User,
+  ) {
+    return this.tasksService.counterTaskBid(id, bidId, counterTaskBidDto, currentUser);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ResponseMessage('Task bid history fetched successfully!')
+  @Get(':id/bids/:bidId/history')
+  getTaskBidHistory(
+    @Param('id') id: string,
+    @Param('bidId') bidId: string,
+    @CurrentUser() currentUser: User,
+  ) {
+    return this.tasksService.getTaskBidHistory(id, bidId, currentUser);
   }
 }
