@@ -254,6 +254,15 @@ export class TasksService {
     return tasksWithBidCount;
   }
 
+  async getMyBids(currentUser: User) {
+    const bids = await this.taskBidRepo.find(
+      { createdBy: currentUser },
+      { populate: ['task', 'task.category', 'task.postedBy'] },
+    );
+
+    return bids;
+  }
+
   async counterTaskBid(
     publicId: string,
     bidId: string,

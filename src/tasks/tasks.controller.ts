@@ -39,6 +39,13 @@ export class TasksController {
     return this.tasksService.findMyTasks(currentUser);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ResponseMessage('User bids retrieved successfully!')
+  @Get('bids/me')
+  getMyBids(@CurrentUser() currentUser: User) {
+    return this.tasksService.getMyBids(currentUser);
+  }
+
   @Delete('category/:id')
   removeCategory(@Param('id') id: string) {
     return this.tasksService.remove(+id);
