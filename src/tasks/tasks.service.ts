@@ -283,7 +283,16 @@ export class TasksService {
 
   async getMyBids(currentUser: User) {
     const bids = await this.taskBidRepo.find(
-      { createdBy: currentUser },
+      {
+        createdBy: currentUser,
+        status: {
+          $in: [
+            TaskBidStatus.PENDING,
+            TaskBidStatus.COUNTERED_BY_CLIENT,
+            TaskBidStatus.COUNTERED_BY_RUNNER,
+          ],
+        },
+      },
       { populate: ['task', 'task.category', 'task.postedBy'] },
     );
 
@@ -627,6 +636,16 @@ export class TasksService {
       NotificationType.TASK_ASSIGNED,
       'Your bid was accepted!',
       `Your bid of ${bidAmount} on "${task.title}" was accepted. Task is now in progress.`,
+      task,
+      taskBid,
+    );
+
+    // Notify client of successful task assignment
+    await this.notificationsService.createNotification(
+      currentUser,
+      NotificationType.BID_ACCEPTED,
+      'Task assigned successfully!',
+      `You accepted ${taskBid.createdBy.firstName} ${taskBid.createdBy.lastName}'s bid of ${bidAmount} on "${task.title}". Task is now in progress.`,
       task,
       taskBid,
     );
