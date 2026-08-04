@@ -7,9 +7,15 @@ import { Task } from './entities/task.entity';
 import { User } from 'src/users/entities/user.entity';
 import { TaskBid } from './entities/task-bid.entity';
 import { TaskBidNegotiation } from './entities/task-bid-negotiation.entity';
+import { Payment } from './entities/payment.entity';
+import { SystemSettings } from './entities/system-settings.entity';
+import { NotificationsModule } from 'src/notifications/notifications.module';
 
 @Module({
-  imports: [MikroOrmModule.forFeature([TaskCategory, Task, TaskBid, TaskBidNegotiation, User])],
+  imports: [
+    MikroOrmModule.forFeature([TaskCategory, Task, TaskBid, TaskBidNegotiation, Payment, SystemSettings, User]),
+    NotificationsModule,
+  ],
   controllers: [TasksController],
   providers: [TasksService],
 })

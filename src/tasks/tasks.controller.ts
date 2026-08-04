@@ -46,6 +46,13 @@ export class TasksController {
     return this.tasksService.getMyBids(currentUser);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ResponseMessage('Assigned tasks retrieved successfully!')
+  @Get('assigned/me')
+  getMyAssignedTasks(@CurrentUser() currentUser: User) {
+    return this.tasksService.getMyAssignedTasks(currentUser);
+  }
+
   @Delete('category/:id')
   removeCategory(@Param('id') id: string) {
     return this.tasksService.remove(+id);
@@ -126,5 +133,38 @@ export class TasksController {
     @CurrentUser() currentUser: User,
   ) {
     return this.tasksService.getTaskBidHistory(id, bidId, currentUser);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ResponseMessage('Payment breakdown retrieved successfully!')
+  @Get(':id/bids/:bidId/payment-breakdown')
+  getPaymentBreakdown(
+    @Param('id') id: string,
+    @Param('bidId') bidId: string,
+    @CurrentUser() currentUser: User,
+  ) {
+    return this.tasksService.getPaymentBreakdown(id, bidId, currentUser);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ResponseMessage('Task bid accepted successfully!')
+  @Post(':id/bids/:bidId/accept')
+  acceptTaskBid(
+    @Param('id') id: string,
+    @Param('bidId') bidId: string,
+    @CurrentUser() currentUser: User,
+  ) {
+    return this.tasksService.acceptTaskBid(id, bidId, currentUser);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ResponseMessage('Task bid rejected successfully!')
+  @Post(':id/bids/:bidId/reject')
+  rejectTaskBid(
+    @Param('id') id: string,
+    @Param('bidId') bidId: string,
+    @CurrentUser() currentUser: User,
+  ) {
+    return this.tasksService.rejectTaskBid(id, bidId, currentUser);
   }
 }

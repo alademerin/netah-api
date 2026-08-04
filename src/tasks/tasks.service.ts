@@ -19,6 +19,11 @@ import { NotFoundError } from 'rxjs';
 import { MyTaskResponseDto } from './dto/my-task.response.dto';
 import { CounterTaskBidDto } from './dto/counter-task-bid.dto';
 import { NegotiationRole, TaskBidNegotiation } from './entities/task-bid-negotiation.entity';
+import { Payment, PaymentStatus } from './entities/payment.entity';
+import { SystemSettings } from './entities/system-settings.entity';
+import { NotificationType } from './entities/notification.entity';
+import { NotificationsService } from 'src/notifications/notifications.service';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class TasksService {
@@ -35,8 +40,16 @@ export class TasksService {
     @InjectRepository(TaskBidNegotiation)
     private readonly taskBidNegotiationRepo: EntityRepository<TaskBidNegotiation>,
 
+    @InjectRepository(Payment)
+    private readonly paymentRepo: EntityRepository<Payment>,
+
+    @InjectRepository(SystemSettings)
+    private readonly systemSettingsRepo: EntityRepository<SystemSettings>,
+
     @InjectRepository(User)
     private readonly userRepo: EntityRepository<User>,
+
+    private readonly notificationsService: NotificationsService,
 
     private readonly em: EntityManager,
   ) {}
@@ -139,10 +152,13 @@ export class TasksService {
   }
 
   async createBid(id: string, createTaskBidDto: CreateTaskBidDto, currentUser: User) {
-    const task = await this.taskRepo.findOneOrFail({
-      publicId: id,
-      status: TaskStatusEnum.OPEN,
-    });
+    const task = await this.taskRepo.findOneOrFail(
+      {
+        publicId: id,
+        status: TaskStatusEnum.OPEN,
+      },
+      { populate: ['postedBy'] },
+    );
 
     if (task?.postedBy?.id === currentUser?.id) {
       throw new BadRequestException('You cannot bid on your own task');
@@ -177,6 +193,17 @@ export class TasksService {
     });
 
     await this.em.persistAndFlush(bidHistory);
+
+    // Notify task poster of new bid
+    await this.notificationsService.createNotification(
+      task.postedBy,
+      NotificationType.NEW_BID,
+      'New bid on your task',
+      `${currentUser.firstName} ${currentUser.lastName} bid ${createTaskBidDto.amount} on "${task.title}"`,
+      task,
+      taskBid,
+    );
+
     return taskBid;
   }
 
@@ -263,15 +290,27 @@ export class TasksService {
     return bids;
   }
 
+  async getMyAssignedTasks(currentUser: User) {
+    const tasks = await this.taskRepo.find(
+      { assignedTo: currentUser },
+      { populate: ['category', 'postedBy', 'assignedTo'] },
+    );
+
+    return tasks;
+  }
+
   async counterTaskBid(
     publicId: string,
     bidId: string,
     counterTaskBidDto: CounterTaskBidDto,
     currentUser: User,
   ) {
-    const task = await this.taskRepo.findOne({
-      publicId,
-    });
+    const task = await this.taskRepo.findOne(
+      {
+        publicId,
+      },
+      { populate: ['postedBy'] },
+    );
 
     if (!task) {
       throw new NotFoundException('Task not found');
@@ -317,6 +356,22 @@ export class TasksService {
     });
 
     await this.em.persistAndFlush([taskBid, bidHistory]);
+
+    // Notify the other party of counter offer
+    const notificationRecipient = isTaskPoster ? taskBid.createdBy : task.postedBy;
+    const notificationType = isTaskPoster
+      ? NotificationType.COUNTER_OFFER_CLIENT
+      : NotificationType.COUNTER_OFFER_RUNNER;
+
+    await this.notificationsService.createNotification(
+      notificationRecipient,
+      notificationType,
+      'Counter offer received',
+      `${currentUser.firstName} ${currentUser.lastName} countered with ${counterTaskBidDto.amount} on "${task.title}"`,
+      task,
+      taskBid,
+    );
+
     return taskBid;
   }
 
@@ -376,5 +431,275 @@ export class TasksService {
         },
       })),
     };
+  }
+
+  async getPaymentBreakdown(publicId: string, bidId: string, currentUser: User) {
+    const task = await this.taskRepo.findOne({ publicId });
+
+    if (!task) {
+      throw new NotFoundException('Task not found');
+    }
+
+    if (task.postedBy.id !== currentUser.id) {
+      throw new UnauthorizedException('Only task owner can view payment breakdown');
+    }
+
+    const parsedBidId = Number(bidId);
+    if (!Number.isInteger(parsedBidId) || parsedBidId <= 0) {
+      throw new BadRequestException('Invalid bid id');
+    }
+
+    const taskBid = await this.taskBidRepo.findOne(
+      { id: parsedBidId, task },
+      { populate: ['createdBy', 'task'] },
+    );
+
+    if (!taskBid) {
+      throw new NotFoundException('Task bid not found');
+    }
+
+    if (taskBid.status === TaskBidStatus.ACCEPTED) {
+      throw new BadRequestException('Bid already accepted');
+    }
+
+    if (taskBid.status === TaskBidStatus.REJECTED) {
+      throw new BadRequestException('Cannot view breakdown for rejected bid');
+    }
+
+    // Get service charge settings
+    const serviceChargePercentageSetting = await this.systemSettingsRepo.findOne({
+      key: 'service_charge_percentage',
+    });
+    const serviceChargeFixedSetting = await this.systemSettingsRepo.findOne({
+      key: 'service_charge_fixed',
+    });
+
+    // Calculate service charge (apply both and use higher value)
+    let serviceCharge = 0;
+    let appliedChargeType = 'none';
+    const bidAmount = Number(taskBid.amount);
+
+    const percentageCharge = serviceChargePercentageSetting
+      ? bidAmount * Number(serviceChargePercentageSetting.value)
+      : 0;
+    const fixedCharge = serviceChargeFixedSetting
+      ? Number(serviceChargeFixedSetting.value)
+      : 0;
+
+    if (percentageCharge > fixedCharge) {
+      serviceCharge = percentageCharge;
+      appliedChargeType = 'percentage';
+    } else if (fixedCharge > 0) {
+      serviceCharge = fixedCharge;
+      appliedChargeType = 'fixed';
+    }
+
+    const totalAmount = bidAmount + serviceCharge;
+
+    return {
+      bid: {
+        id: taskBid.id,
+        amount: taskBid.amount,
+        message: taskBid.message,
+        status: taskBid.status,
+        runner: {
+          id: taskBid.createdBy.id,
+          firstName: taskBid.createdBy.firstName,
+          lastName: taskBid.createdBy.lastName,
+        },
+      },
+      breakdown: {
+        bidAmount,
+        serviceCharge,
+        serviceChargeType: appliedChargeType,
+        totalAmount,
+      },
+    };
+  }
+
+  async acceptTaskBid(publicId: string, bidId: string, currentUser: User) {
+    const task = await this.taskRepo.findOne(
+      { publicId },
+      { populate: ['postedBy', 'assignedTo'] },
+    );
+
+    if (!task) {
+      throw new NotFoundException('Task not found');
+    }
+
+    if (task.postedBy.id !== currentUser.id) {
+      throw new UnauthorizedException('Only task owner can accept bids');
+    }
+
+    if (task.status !== TaskStatusEnum.OPEN) {
+      throw new BadRequestException('Task is not open for bids');
+    }
+
+    const parsedBidId = Number(bidId);
+    if (!Number.isInteger(parsedBidId) || parsedBidId <= 0) {
+      throw new BadRequestException('Invalid bid id');
+    }
+
+    const taskBid = await this.taskBidRepo.findOne(
+      { id: parsedBidId, task },
+      { populate: ['createdBy'] },
+    );
+
+    if (!taskBid) {
+      throw new NotFoundException('Task bid not found');
+    }
+
+    if (taskBid.status === TaskBidStatus.ACCEPTED) {
+      throw new BadRequestException('Bid already accepted');
+    }
+
+    if (taskBid.status === TaskBidStatus.REJECTED) {
+      throw new BadRequestException('Cannot accept a rejected bid');
+    }
+
+    // Get service charge settings
+    const serviceChargePercentageSetting = await this.systemSettingsRepo.findOne({
+      key: 'service_charge_percentage',
+    });
+    const serviceChargeFixedSetting = await this.systemSettingsRepo.findOne({
+      key: 'service_charge_fixed',
+    });
+
+    // Calculate service charge (apply both and use higher value)
+    let serviceCharge = 0;
+    const bidAmount = Number(taskBid.amount);
+
+    if (serviceChargePercentageSetting) {
+      const percentage = Number(serviceChargePercentageSetting.value);
+      const percentageCharge = bidAmount * percentage;
+      serviceCharge = Math.max(serviceCharge, percentageCharge);
+    }
+
+    if (serviceChargeFixedSetting) {
+      const fixedCharge = Number(serviceChargeFixedSetting.value);
+      serviceCharge = Math.max(serviceCharge, fixedCharge);
+    }
+
+    const totalAmount = bidAmount + serviceCharge;
+
+    // Create mock payment
+    const payment = this.paymentRepo.create({
+      taskBid,
+      paidBy: currentUser,
+      bidAmount,
+      serviceCharge,
+      totalAmount,
+      paymentReference: `MOCK-${uuidv4()}`,
+      status: PaymentStatus.COMPLETED,
+      completedAt: new Date(),
+    });
+
+    // Update bid status
+    taskBid.status = TaskBidStatus.ACCEPTED;
+
+    // Assign task to runner
+    task.assignedTo = taskBid.createdBy;
+    task.status = TaskStatusEnum.IN_PROGRESS;
+
+    // Auto-reject other bids
+    const otherBids = await this.taskBidRepo.find({
+      task,
+      id: { $ne: parsedBidId },
+      status: {
+        $in: [
+          TaskBidStatus.PENDING,
+          TaskBidStatus.COUNTERED_BY_CLIENT,
+          TaskBidStatus.COUNTERED_BY_RUNNER,
+        ],
+      },
+    });
+
+    otherBids.forEach((bid) => {
+      bid.status = TaskBidStatus.REJECTED;
+      bid.deletedAt = new Date();
+    });
+
+    await this.em.persistAndFlush([payment, taskBid, task, ...otherBids]);
+
+    // Notify runner of task assignment
+    await this.notificationsService.createNotification(
+      taskBid.createdBy,
+      NotificationType.TASK_ASSIGNED,
+      'Your bid was accepted!',
+      `Your bid of ${bidAmount} on "${task.title}" was accepted. Task is now in progress.`,
+      task,
+      taskBid,
+    );
+
+    return {
+      task,
+      bid: taskBid,
+      payment: {
+        id: payment.id,
+        bidAmount: payment.bidAmount,
+        serviceCharge: payment.serviceCharge,
+        totalAmount: payment.totalAmount,
+        paymentReference: payment.paymentReference,
+        status: payment.status,
+      },
+    };
+  }
+
+  async rejectTaskBid(publicId: string, bidId: string, currentUser: User) {
+    const task = await this.taskRepo.findOne(
+      { publicId },
+      { populate: ['postedBy'] },
+    );
+
+    if (!task) {
+      throw new NotFoundException('Task not found');
+    }
+
+    if (task.postedBy.id !== currentUser.id) {
+      throw new UnauthorizedException('Only task owner can reject bids');
+    }
+
+    const parsedBidId = Number(bidId);
+    if (!Number.isInteger(parsedBidId) || parsedBidId <= 0) {
+      throw new BadRequestException('Invalid bid id');
+    }
+
+    const taskBid = await this.taskBidRepo.findOne(
+      {
+        id: parsedBidId,
+        task,
+      },
+      { populate: ['createdBy'] },
+    );
+
+    if (!taskBid) {
+      throw new NotFoundException('Task bid not found');
+    }
+
+    if (taskBid.status === TaskBidStatus.ACCEPTED) {
+      throw new BadRequestException('Cannot reject an accepted bid');
+    }
+
+    if (taskBid.status === TaskBidStatus.REJECTED) {
+      throw new BadRequestException('Bid already rejected');
+    }
+
+    // Soft delete the bid
+    taskBid.status = TaskBidStatus.REJECTED;
+    taskBid.deletedAt = new Date();
+
+    await this.em.flush();
+
+    // Notify runner of bid rejection
+    await this.notificationsService.createNotification(
+      taskBid.createdBy,
+      NotificationType.BID_REJECTED,
+      'Your bid was rejected',
+      `Your bid on "${task.title}" was rejected. You can submit a new bid if you wish.`,
+      task,
+      taskBid,
+    );
+
+    return { message: 'Bid rejected successfully. Runner can bid again if desired.' };
   }
 }
