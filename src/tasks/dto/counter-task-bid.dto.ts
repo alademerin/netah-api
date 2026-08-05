@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
 export class CounterTaskBidDto {
   @ApiProperty({
@@ -8,6 +8,7 @@ export class CounterTaskBidDto {
   })
   @IsNumber()
   @IsNotEmpty({ message: 'Counter amount is required' })
+  @Min(500, { message: 'Counter amount must be at least 500' })
   amount!: number;
 
   @ApiPropertyOptional({

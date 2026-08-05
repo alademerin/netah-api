@@ -18,6 +18,9 @@ import { TaskBid } from './entities/task-bid.entity';
 import { NotFoundError } from 'rxjs';
 import { MyTaskResponseDto } from './dto/my-task.response.dto';
 import { CounterTaskBidDto } from './dto/counter-task-bid.dto';
+import { ApproveTaskDto } from './dto/approve-task.dto';
+import { DisputeTaskDto } from './dto/dispute-task.dto';
+import { ReviewPosterDto } from './dto/review-poster.dto';
 import { NegotiationRole, TaskBidNegotiation } from './entities/task-bid-negotiation.entity';
 import { Payment, PaymentStatus } from './entities/payment.entity';
 import { SystemSettings } from './entities/system-settings.entity';
@@ -86,9 +89,14 @@ export class TasksService {
   }
 
   async findAll() {
-    return await this.taskRepo.findAll({
-      populate: ['category', 'postedBy', 'assignedTo'],
-    });
+    return await this.taskRepo.find(
+      {
+        status: TaskStatusEnum.OPEN,
+      },
+      {
+        populate: ['category', 'postedBy'],
+      },
+    );
   }
 
   async findOne(id: number) {
@@ -96,13 +104,28 @@ export class TasksService {
     return task;
   }
 
-  async findOneByUuid(publicId: string) {
+  async findOneByUuid(publicId: string, currentUser?: User): Promise<any> {
     const task = await this.taskRepo.findOne(
       { publicId },
       {
         populate: ['category', 'postedBy', 'assignedTo'],
       },
     );
+
+    if (!task) {
+      throw new NotFoundException('Task not found');
+    }
+
+    if (currentUser) {
+      const isRunner = task.assignedTo?.id === currentUser.id;
+      const isPoster = task.postedBy.id === currentUser.id;
+
+      return {
+        ...task,
+        hasReviewed: isRunner ? !!task.posterRating : isPoster ? !!task.rating : false,
+      };
+    }
+
     return task;
   }
 
@@ -174,9 +197,15 @@ export class TasksService {
       throw new BadRequestException('You already have an active bid on this task');
     }
 
+    // Get full user object with names
+    const bidder = await this.userRepo.findOne({ id: currentUser.id });
+    if (!bidder) {
+      throw new NotFoundException('User not found');
+    }
+
     const taskBid = this.taskBidRepo.create({
       task,
-      createdBy: currentUser.id,
+      createdBy: bidder,
       amount: createTaskBidDto.amount,
       message: createTaskBidDto.message,
       status: TaskBidStatus.PENDING,
@@ -188,7 +217,7 @@ export class TasksService {
       taskBid,
       amount: createTaskBidDto.amount,
       message: createTaskBidDto.message,
-      createdBy: currentUser,
+      createdBy: bidder,
       role: NegotiationRole.RUNNER,
     });
 
@@ -199,7 +228,7 @@ export class TasksService {
       task.postedBy,
       NotificationType.NEW_BID,
       'New bid on your task',
-      `${currentUser.firstName} ${currentUser.lastName} bid ${createTaskBidDto.amount} on "${task.title}"`,
+      `${bidder.firstName} ${bidder.lastName} bid ${createTaskBidDto.amount} on "${task.title}"`,
       task,
       taskBid,
     );
@@ -265,7 +294,7 @@ export class TasksService {
 
         return {
           id: task.id,
-          publicId: task.publicId,
+          publicId: task.publicId!,
           title: task.title,
           description: task.description,
           location: task.location,
@@ -274,6 +303,7 @@ export class TasksService {
           status: task.status,
           createdAt: task.createdAt,
           bidCount,
+          hasReviewed: !!task.rating,
         };
       }),
     );
@@ -299,13 +329,16 @@ export class TasksService {
     return bids;
   }
 
-  async getMyAssignedTasks(currentUser: User) {
+  async getMyAssignedTasks(currentUser: User): Promise<any[]> {
     const tasks = await this.taskRepo.find(
       { assignedTo: currentUser },
       { populate: ['category', 'postedBy', 'assignedTo'] },
     );
 
-    return tasks;
+    return tasks.map((task) => ({
+      ...task,
+      hasReviewed: !!task.posterRating,
+    }));
   }
 
   async counterTaskBid(
@@ -352,6 +385,12 @@ export class TasksService {
       throw new UnauthorizedException('You are not allowed to counter this bid');
     }
 
+    // Get full user object with names
+    const counteringUser = await this.userRepo.findOne({ id: currentUser.id });
+    if (!counteringUser) {
+      throw new NotFoundException('User not found');
+    }
+
     taskBid.amount = counterTaskBidDto.amount;
     taskBid.message = counterTaskBidDto.message ?? taskBid.message;
     taskBid.status = isTaskPoster ? TaskBidStatus.COUNTERED_BY_CLIENT : TaskBidStatus.COUNTERED_BY_RUNNER;
@@ -360,7 +399,7 @@ export class TasksService {
       taskBid,
       amount: counterTaskBidDto.amount,
       message: counterTaskBidDto.message,
-      createdBy: currentUser,
+      createdBy: counteringUser,
       role: isTaskPoster ? NegotiationRole.CLIENT : NegotiationRole.RUNNER,
     });
 
@@ -376,7 +415,7 @@ export class TasksService {
       notificationRecipient,
       notificationType,
       'Counter offer received',
-      `${currentUser.firstName} ${currentUser.lastName} countered with ${counterTaskBidDto.amount} on "${task.title}"`,
+      `${counteringUser.firstName} ${counteringUser.lastName} countered with ${counterTaskBidDto.amount} on "${task.title}"`,
       task,
       taskBid,
     );
@@ -720,5 +759,334 @@ export class TasksService {
     );
 
     return { message: 'Bid rejected successfully. Runner can bid again if desired.' };
+  }
+
+  async withdrawBid(publicId: string, bidId: string, currentUser: User) {
+    const task = await this.taskRepo.findOne(
+      { publicId },
+      { populate: ['postedBy'] },
+    );
+
+    if (!task) {
+      throw new NotFoundException('Task not found');
+    }
+
+    const parsedBidId = Number(bidId);
+    if (!Number.isInteger(parsedBidId) || parsedBidId <= 0) {
+      throw new BadRequestException('Invalid bid id');
+    }
+
+    const taskBid = await this.taskBidRepo.findOne(
+      {
+        id: parsedBidId,
+        task,
+      },
+      { populate: ['createdBy'] },
+    );
+
+    if (!taskBid) {
+      throw new NotFoundException('Task bid not found');
+    }
+
+    if (taskBid.createdBy.id !== currentUser.id) {
+      throw new UnauthorizedException('Only the bid creator can withdraw this bid');
+    }
+
+    if (taskBid.status === TaskBidStatus.ACCEPTED) {
+      throw new BadRequestException('Cannot withdraw an accepted bid');
+    }
+
+    if (taskBid.status === TaskBidStatus.REJECTED) {
+      throw new BadRequestException('Bid already rejected/withdrawn');
+    }
+
+    // Soft delete the bid
+    taskBid.status = TaskBidStatus.REJECTED;
+    taskBid.deletedAt = new Date();
+
+    await this.em.flush();
+
+    // Notify poster of withdrawal
+    await this.notificationsService.createNotification(
+      task.postedBy,
+      NotificationType.BID_REJECTED,
+      'Bid withdrawn',
+      `${taskBid.createdBy.firstName} ${taskBid.createdBy.lastName} withdrew their bid of ${taskBid.amount} on "${task.title}".`,
+      task,
+      taskBid,
+    );
+
+    return { message: 'Bid withdrawn successfully' };
+  }
+
+  async getCompletionDetails(publicId: string, currentUser: User) {
+    const task = await this.taskRepo.findOne(
+      { publicId },
+      { populate: ['postedBy', 'assignedTo', 'category'] },
+    );
+
+    if (!task) {
+      throw new NotFoundException('Task not found');
+    }
+
+    if (task.postedBy.id !== currentUser.id) {
+      throw new UnauthorizedException('Only task poster can view completion details');
+    }
+
+    if (task.status !== TaskStatusEnum.PENDING_APPROVAL) {
+      throw new BadRequestException('Task must be pending approval');
+    }
+
+    if (!task.assignedTo) {
+      throw new BadRequestException('No runner assigned to this task');
+    }
+
+    // Get the accepted bid to find payment details
+    const acceptedBid = await this.taskBidRepo.findOne({
+      task,
+      status: TaskBidStatus.ACCEPTED,
+    });
+
+    if (!acceptedBid) {
+      throw new NotFoundException('Accepted bid not found');
+    }
+
+    // Get payment record
+    const payment = await this.paymentRepo.findOne({
+      taskBid: acceptedBid,
+    });
+
+    if (!payment) {
+      throw new NotFoundException('Payment record not found');
+    }
+
+    const amountToDisburse = Number(payment.bidAmount);
+
+    return {
+      task: {
+        id: task.id,
+        publicId: task.publicId,
+        title: task.title,
+        description: task.description,
+        status: task.status,
+        category: task.category.name,
+        hasReviewed: !!task.rating,
+      },
+      runner: {
+        id: task.assignedTo.id,
+        firstName: task.assignedTo.firstName,
+        lastName: task.assignedTo.lastName,
+        email: task.assignedTo.email,
+      },
+      amountToDisburse,
+    };
+  }
+
+  async markTaskAsCompleted(publicId: string, currentUser: User) {
+    const task = await this.taskRepo.findOne(
+      { publicId },
+      { populate: ['assignedTo', 'postedBy'] },
+    );
+
+    if (!task) {
+      throw new NotFoundException('Task not found');
+    }
+
+    if (!task.assignedTo || task.assignedTo.id !== currentUser.id) {
+      throw new UnauthorizedException('Only the assigned runner can mark task as completed');
+    }
+
+    if (task.status !== TaskStatusEnum.IN_PROGRESS) {
+      throw new BadRequestException('Only in-progress tasks can be marked as completed');
+    }
+
+    task.status = TaskStatusEnum.PENDING_APPROVAL;
+
+    await this.em.flush();
+
+    // Notify poster that task is ready for approval
+    await this.notificationsService.createNotification(
+      task.postedBy,
+      NotificationType.TASK_STATUS_CHANGED,
+      'Task completed - awaiting approval',
+      `${task.assignedTo.firstName} ${task.assignedTo.lastName} marked "${task.title}" as completed. Please review and approve.`,
+      task,
+    );
+
+    // Notify runner (confirmation)
+    await this.notificationsService.createNotification(
+      task.assignedTo,
+      NotificationType.TASK_STATUS_CHANGED,
+      'Task marked as completed',
+      `You marked "${task.title}" as completed. Waiting for client approval.`,
+      task,
+    );
+
+    return task;
+  }
+
+  async approveAndReleaseFunds(publicId: string, approveTaskDto: ApproveTaskDto, currentUser: User) {
+    const task = await this.taskRepo.findOne(
+      { publicId },
+      { populate: ['postedBy', 'assignedTo'] },
+    );
+
+    if (!task) {
+      throw new NotFoundException('Task not found');
+    }
+
+    if (task.postedBy.id !== currentUser.id) {
+      throw new UnauthorizedException('Only task poster can approve and release funds');
+    }
+
+    if (task.status !== TaskStatusEnum.PENDING_APPROVAL) {
+      throw new BadRequestException('Task must be pending approval');
+    }
+
+    if (!task.assignedTo) {
+      throw new BadRequestException('No runner assigned to this task');
+    }
+
+    // Store rating and feedback
+    task.rating = approveTaskDto.rating;
+    task.feedback = approveTaskDto.feedback;
+    task.status = TaskStatusEnum.COMPLETED;
+    task.completedAt = new Date();
+
+    await this.em.flush();
+
+    // Notify runner that task is approved and funds released
+    const feedbackText = approveTaskDto.feedback
+      ? ` Feedback: "${approveTaskDto.feedback}"`
+      : '';
+    await this.notificationsService.createNotification(
+      task.assignedTo,
+      NotificationType.TASK_STATUS_CHANGED,
+      'Task approved - funds released!',
+      `Your completed task "${task.title}" has been approved with ${approveTaskDto.rating} stars.${feedbackText} Funds have been released.`,
+      task,
+    );
+
+    // Notify poster (confirmation)
+    await this.notificationsService.createNotification(
+      task.postedBy,
+      NotificationType.TASK_STATUS_CHANGED,
+      'Task completed successfully',
+      `You approved "${task.title}" with ${approveTaskDto.rating} stars. Funds released to ${task.assignedTo.firstName} ${task.assignedTo.lastName}.`,
+      task,
+    );
+
+    return {
+      task,
+      message: 'Task approved and funds released successfully',
+    };
+  }
+
+  async disputeTask(publicId: string, disputeTaskDto: DisputeTaskDto, currentUser: User) {
+    const task = await this.taskRepo.findOne(
+      { publicId },
+      { populate: ['postedBy', 'assignedTo'] },
+    );
+
+    if (!task) {
+      throw new NotFoundException('Task not found');
+    }
+
+    if (!task.assignedTo) {
+      throw new BadRequestException('No runner assigned to this task');
+    }
+
+    const isPoster = task.postedBy.id === currentUser.id;
+    const isRunner = task.assignedTo.id === currentUser.id;
+
+    if (!isPoster && !isRunner) {
+      throw new UnauthorizedException('Only task poster or runner can dispute a task');
+    }
+
+    // Poster can only dispute during PENDING_APPROVAL
+    if (isPoster && task.status !== TaskStatusEnum.PENDING_APPROVAL) {
+      throw new BadRequestException('Poster can only dispute pending approval tasks');
+    }
+
+    // Runner can dispute during IN_PROGRESS or PENDING_APPROVAL
+    if (isRunner && ![TaskStatusEnum.IN_PROGRESS, TaskStatusEnum.PENDING_APPROVAL].includes(task.status)) {
+      throw new BadRequestException('Runner can only dispute in-progress or pending approval tasks');
+    }
+
+    task.status = TaskStatusEnum.DISPUTED;
+    task.disputeReason = disputeTaskDto.reason;
+
+    await this.em.flush();
+
+    // Notify the other party
+    const otherParty = isPoster ? task.assignedTo : task.postedBy;
+    const disputingPartyName = isPoster
+      ? 'Task poster'
+      : `${currentUser.firstName} ${currentUser.lastName}`;
+
+    await this.notificationsService.createNotification(
+      otherParty,
+      NotificationType.TASK_STATUS_CHANGED,
+      'Task disputed',
+      `${disputingPartyName} disputed "${task.title}". Reason: ${disputeTaskDto.reason}`,
+      task,
+    );
+
+    // Notify disputing party (confirmation)
+    await this.notificationsService.createNotification(
+      currentUser,
+      NotificationType.TASK_STATUS_CHANGED,
+      'Dispute submitted',
+      `You disputed "${task.title}". Our support team will review this case and contact both parties.`,
+      task,
+    );
+
+    return {
+      task,
+      message: 'Dispute submitted successfully. Our support team will review this case.',
+    };
+  }
+
+  async reviewPoster(publicId: string, reviewPosterDto: ReviewPosterDto, currentUser: User) {
+    const task = await this.taskRepo.findOne(
+      { publicId },
+      { populate: ['postedBy', 'assignedTo'] },
+    );
+
+    if (!task) {
+      throw new NotFoundException('Task not found');
+    }
+
+    if (!task.assignedTo || task.assignedTo.id !== currentUser.id) {
+      throw new UnauthorizedException('Only the assigned runner can review the poster');
+    }
+
+    if (task.status !== TaskStatusEnum.COMPLETED) {
+      throw new BadRequestException('Only completed tasks can be reviewed');
+    }
+
+    if (task.posterRating) {
+      throw new BadRequestException('You have already reviewed this poster');
+    }
+
+    task.posterRating = reviewPosterDto.rating;
+    task.posterReview = reviewPosterDto.review;
+
+    await this.em.flush();
+
+    // Notify poster of review
+    const reviewText = reviewPosterDto.review ? ` Review: "${reviewPosterDto.review}"` : '';
+    await this.notificationsService.createNotification(
+      task.postedBy,
+      NotificationType.TASK_STATUS_CHANGED,
+      'You received a review!',
+      `${task.assignedTo.firstName} ${task.assignedTo.lastName} rated you ${reviewPosterDto.rating} stars for "${task.title}".${reviewText}`,
+      task,
+    );
+
+    return {
+      task,
+      message: 'Review submitted successfully',
+    };
   }
 }

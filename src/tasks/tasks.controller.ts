@@ -9,6 +9,9 @@ import { User } from 'src/users/entities/user.entity';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { CreateTaskBidDto } from './dto/create-task-bid.dto';
 import { CounterTaskBidDto } from './dto/counter-task-bid.dto';
+import { ApproveTaskDto } from './dto/approve-task.dto';
+import { DisputeTaskDto } from './dto/dispute-task.dto';
+import { ReviewPosterDto } from './dto/review-poster.dto';
 
 @Controller('tasks')
 export class TasksController {
@@ -49,7 +52,7 @@ export class TasksController {
   @UseGuards(JwtAuthGuard)
   @ResponseMessage('Assigned tasks retrieved successfully!')
   @Get('assigned/me')
-  getMyAssignedTasks(@CurrentUser() currentUser: User) {
+  getMyAssignedTasks(@CurrentUser() currentUser: User): Promise<any[]> {
     return this.tasksService.getMyAssignedTasks(currentUser);
   }
 
@@ -59,8 +62,8 @@ export class TasksController {
   }
 
   @Get(':id')
-  findOneByUuid(@Param('id') id: string) {
-    return this.tasksService.findOneByUuid(id);
+  findOneByUuid(@Param('id') id: string, @CurrentUser() currentUser?: User): Promise<any> {
+    return this.tasksService.findOneByUuid(id, currentUser);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -166,5 +169,63 @@ export class TasksController {
     @CurrentUser() currentUser: User,
   ) {
     return this.tasksService.rejectTaskBid(id, bidId, currentUser);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ResponseMessage('Bid withdrawn successfully!')
+  @Post(':id/bids/:bidId/withdraw')
+  withdrawBid(
+    @Param('id') id: string,
+    @Param('bidId') bidId: string,
+    @CurrentUser() currentUser: User,
+  ) {
+    return this.tasksService.withdrawBid(id, bidId, currentUser);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ResponseMessage('Task marked as completed successfully!')
+  @Post(':id/complete')
+  markTaskAsCompleted(@Param('id') id: string, @CurrentUser() currentUser: User) {
+    return this.tasksService.markTaskAsCompleted(id, currentUser);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ResponseMessage('Completion template retrieved successfully!')
+  @Get(':id/complete/template')
+  getCompletionDetails(@Param('id') id: string, @CurrentUser() currentUser: User) {
+    return this.tasksService.getCompletionDetails(id, currentUser);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ResponseMessage('Funds released successfully!')
+  @Post(':id/approve')
+  approveAndReleaseFunds(
+    @Param('id') id: string,
+    @Body() approveTaskDto: ApproveTaskDto,
+    @CurrentUser() currentUser: User,
+  ) {
+    return this.tasksService.approveAndReleaseFunds(id, approveTaskDto, currentUser);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ResponseMessage('Dispute submitted successfully!')
+  @Post(':id/dispute')
+  disputeTask(
+    @Param('id') id: string,
+    @Body() disputeTaskDto: DisputeTaskDto,
+    @CurrentUser() currentUser: User,
+  ) {
+    return this.tasksService.disputeTask(id, disputeTaskDto, currentUser);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ResponseMessage('Poster review submitted successfully!')
+  @Post(':id/review-poster')
+  reviewPoster(
+    @Param('id') id: string,
+    @Body() reviewPosterDto: ReviewPosterDto,
+    @CurrentUser() currentUser: User,
+  ) {
+    return this.tasksService.reviewPoster(id, reviewPosterDto, currentUser);
   }
 }

@@ -7,6 +7,7 @@ import {
   IsEnum,
   IsArray,
   IsOptional,
+  Min,
 } from 'class-validator';
 
 export enum TaskUrgencyEnum {
@@ -20,6 +21,7 @@ export enum TaskStatusEnum {
   AWAITING_PAYMENT = 'AWAITING_PAYMENT',
   IN_PROGRESS = 'IN_PROGRESS',
   PENDING_APPROVAL = 'PENDING_APPROVAL',
+  DISPUTED = 'DISPUTED',
   COMPLETED = 'COMPLETED',
 }
 
@@ -54,6 +56,7 @@ export class CreateTaskDto {
   })
   @IsNumber()
   @IsNotEmpty()
+  @Min(500, { message: 'Reward must be at least 500' })
   reward!: number;
 
   @ApiProperty({

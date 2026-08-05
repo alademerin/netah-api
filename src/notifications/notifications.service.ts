@@ -46,28 +46,36 @@ export class NotificationsService {
       },
     );
 
-    return notifications.map((notification) => ({
-      id: notification.id,
-      type: notification.type,
-      title: notification.title,
-      message: notification.message,
-      isRead: notification.isRead,
-      createdAt: notification.createdAt,
-      readAt: notification.readAt,
-      task: notification.task
-        ? {
-            id: notification.task.id,
-            publicId: notification.task.publicId,
-            title: notification.task.title,
-          }
-        : null,
-      taskBid: notification.taskBid
-        ? {
-            id: notification.taskBid.id,
-            amount: notification.taskBid.amount,
-          }
-        : null,
-    }));
+    const totalUnread = await this.notificationRepo.count({
+      user: currentUser,
+      isRead: false,
+    });
+
+    return {
+      totalUnread,
+      notifications: notifications.map((notification) => ({
+        id: notification.id,
+        type: notification.type,
+        title: notification.title,
+        message: notification.message,
+        isRead: notification.isRead,
+        createdAt: notification.createdAt,
+        readAt: notification.readAt,
+        task: notification.task
+          ? {
+              id: notification.task.id,
+              publicId: notification.task.publicId,
+              title: notification.task.title,
+            }
+          : null,
+        taskBid: notification.taskBid
+          ? {
+              id: notification.taskBid.id,
+              amount: notification.taskBid.amount,
+            }
+          : null,
+      })),
+    };
   }
 
   async markNotificationAsRead(notificationId: number, currentUser: User) {

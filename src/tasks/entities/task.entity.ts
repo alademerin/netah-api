@@ -66,8 +66,26 @@ bidsCount: number & Opt = 0;
   @ManyToOne(() => User, { nullable: true })
   assignedTo?: User;
 
+  @Property({ nullable: true })
+  rating?: number;
+
+  @Property({ nullable: true })
+  feedback?: string;
+
+  @Property({ nullable: true })
+  posterRating?: number;
+
+  @Property({ nullable: true })
+  posterReview?: string;
+
+  @Property({ nullable: true })
+  disputeReason?: string;
+
   @Property({ onCreate: () => new Date() })
   createdAt?: Date;
+
+  @Property({ nullable: true })
+  completedAt?: Date;
 
   @Property({ nullable: true })
   deletedAt?: Date;

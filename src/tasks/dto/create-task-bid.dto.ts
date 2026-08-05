@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsNumber, IsString } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsString, Min } from 'class-validator';
 
 export enum TaskBidStatus {
   PENDING = 'PENDING',
@@ -16,6 +16,7 @@ export class CreateTaskBidDto {
   })
   @IsNumber()
   @IsNotEmpty({ message: 'Bid amount is required' })
+  @Min(500, { message: 'Bid amount must be at least 500' })
   amount!: number;
 
   @ApiProperty({
