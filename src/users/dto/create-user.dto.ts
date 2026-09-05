@@ -60,6 +60,15 @@ export class CreateUserDto {
   address?: string;
 
   @ApiProperty({
+    example: 'Lagos',
+    description: 'User city',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  city?: string;
+
+  @ApiProperty({
     example: 'I am a professional runner with 5 years of experience',
     description: 'User bio',
     required: false,

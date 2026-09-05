@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@mikro-orm/nestjs';
 import { EntityRepository, EntityManager } from '@mikro-orm/postgresql';
 import { User } from 'src/users/entities/user.entity';
@@ -7,6 +7,10 @@ import { Payment } from 'src/tasks/entities/payment.entity';
 import { TaskStatusEnum } from 'src/tasks/dto/create-task.dto';
 import { PaymentStatus } from 'src/tasks/entities/payment.entity';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { UpdateNotificationPreferencesDto } from './dto/update-notification-preferences.dto';
+import { UpdateProfileVisibilityDto } from './dto/update-profile-visibility.dto';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class ProfileService {
@@ -23,8 +27,8 @@ export class ProfileService {
     private readonly em: EntityManager,
   ) {}
 
-  async getUserReviews(userId: number) {
-    const user = await this.userRepo.findOne({ id: userId });
+  async getUserReviews(userUuid: string) {
+    const user = await this.userRepo.findOne({ uuid: userUuid });
 
     if (!user) {
       throw new NotFoundException('User not found');
@@ -181,14 +185,70 @@ export class ProfileService {
     };
   }
 
-  async getProfile(userId: number): Promise<User> {
+  async getProfile(userId: number) {
     const user = await this.userRepo.findOne({ id: userId });
 
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    return user;
+    // Get tasks posted count
+    const tasksPosted = await this.taskRepo.count({
+      postedBy: user,
+    });
+
+    // Get completed tasks count
+    const completedTasks = await this.taskRepo.count({
+      assignedTo: user,
+      status: TaskStatusEnum.COMPLETED,
+    });
+
+    // Get reviews and calculate rating
+    const runnerReviews = await this.taskRepo.find({
+      assignedTo: user,
+      status: TaskStatusEnum.COMPLETED,
+      rating: { $ne: null },
+    });
+
+    const posterReviews = await this.taskRepo.find({
+      postedBy: user,
+      status: TaskStatusEnum.COMPLETED,
+      posterRating: { $ne: null },
+    });
+
+    const allRatings = [
+      ...runnerReviews.map((t) => t.rating!),
+      ...posterReviews.map((t) => t.posterRating!),
+    ];
+
+    const avgRating =
+      allRatings.length > 0
+        ? parseFloat((allRatings.reduce((sum, r) => sum + r, 0) / allRatings.length).toFixed(1))
+        : 0;
+
+    // Calculate on-time rate
+    let onTimeRate = 0;
+    if (completedTasks > 0) {
+      const tasksNotDisputed = await this.taskRepo.count({
+        assignedTo: user,
+        status: TaskStatusEnum.COMPLETED,
+        disputeReason: null,
+      });
+      onTimeRate = parseFloat(((tasksNotDisputed / completedTasks) * 100).toFixed(1));
+    }
+
+    // Calculate response rate (placeholder)
+    const responseRate = tasksPosted > 0 ? 100 : 0;
+
+    return {
+      ...user,
+      tasksPosted,
+      completedTasksCount: completedTasks,
+      rating: avgRating,
+      totalReviews: allRatings.length,
+      onTimeRate,
+      responseRate,
+    };
   }
 
   async updateProfile(userId: number, updateProfileDto: UpdateProfileDto): Promise<User> {
@@ -228,5 +288,230 @@ export class ProfileService {
     this.userRepo.assign(user, filteredDto);
     await this.em.flush();
     return user;
+  }
+
+  async changePassword(userId: number, changePasswordDto: ChangePasswordDto): Promise<void> {
+    const user = await this.userRepo.findOne({ id: userId });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Verify current password
+    const passwordMatch = await bcrypt.compare(
+      changePasswordDto.currentPassword,
+      user.password,
+    );
+
+    if (!passwordMatch) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    // Update to new password (will be hashed by @BeforeUpdate hook)
+    user.password = changePasswordDto.newPassword;
+    await this.em.flush();
+  }
+
+  async getNotificationPreferences(userId: number) {
+    const user = await this.userRepo.findOne({ id: userId });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return {
+      channels: {
+        emailNotifications: user.emailNotifications ?? true,
+        pushNotifications: user.pushNotifications ?? true,
+        smsNotifications: user.smsNotifications ?? false,
+      },
+      preferences: {
+        notifyNewBids: user.notifyNewBids ?? true,
+        notifyTaskUpdates: user.notifyTaskUpdates ?? true,
+        notifyPaymentAlerts: user.notifyPaymentAlerts ?? true,
+        notifyWeeklyDigest: user.notifyWeeklyDigest ?? false,
+        notifyPromotions: user.notifyPromotions ?? true,
+      },
+    };
+  }
+
+  async updateNotificationPreferences(
+    userId: number,
+    updateDto: UpdateNotificationPreferencesDto,
+  ) {
+    const user = await this.userRepo.findOne({ id: userId });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Filter out undefined values
+    const filteredDto = Object.fromEntries(
+      Object.entries(updateDto).filter(([_, value]) => value !== undefined)
+    );
+
+    this.userRepo.assign(user, filteredDto);
+    await this.em.flush();
+
+    return {
+      channels: {
+        emailNotifications: user.emailNotifications ?? true,
+        pushNotifications: user.pushNotifications ?? true,
+        smsNotifications: user.smsNotifications ?? false,
+      },
+      preferences: {
+        notifyNewBids: user.notifyNewBids ?? true,
+        notifyTaskUpdates: user.notifyTaskUpdates ?? true,
+        notifyPaymentAlerts: user.notifyPaymentAlerts ?? true,
+        notifyWeeklyDigest: user.notifyWeeklyDigest ?? false,
+        notifyPromotions: user.notifyPromotions ?? true,
+      },
+    };
+  }
+
+  async getProfileVisibility(userId: number) {
+    const user = await this.userRepo.findOne({ id: userId });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return {
+      showLocation: user.showLocation ?? true,
+      showRating: user.showRating ?? true,
+      showCompletedTasksCount: user.showCompletedTasksCount ?? true,
+      allowDirectMessages: user.allowDirectMessages ?? true,
+    };
+  }
+
+  async updateProfileVisibility(userId: number, updateDto: UpdateProfileVisibilityDto) {
+    const user = await this.userRepo.findOne({ id: userId });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Filter out undefined values
+    const filteredDto = Object.fromEntries(
+      Object.entries(updateDto).filter(([_, value]) => value !== undefined)
+    );
+
+    this.userRepo.assign(user, filteredDto);
+    await this.em.flush();
+
+    return {
+      showLocation: user.showLocation ?? true,
+      showRating: user.showRating ?? true,
+      showCompletedTasksCount: user.showCompletedTasksCount ?? true,
+      allowDirectMessages: user.allowDirectMessages ?? true,
+    };
+  }
+
+  async getPublicProfile(userUuid: string) {
+    const user = await this.userRepo.findOne({ uuid: userUuid });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Build base profile (always shown)
+    const profile: any = {
+      uuid: user.uuid,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      bio: user.bio,
+      registeredAs: user.registeredAs,
+      createdAt: user.createdAt,
+      allowDirectMessages: user.allowDirectMessages ?? true,
+    };
+
+    // Get tasks posted count (always show)
+    const tasksPosted = await this.taskRepo.count({
+      postedBy: user,
+    });
+    profile.tasksPosted = tasksPosted;
+
+    // Conditionally add location
+    if (user.showLocation ?? true) {
+      profile.city = user.city;
+    }
+
+    // Conditionally add rating
+    if (user.showRating ?? true) {
+      // Get reviews where user was the runner (received rating from poster)
+      const runnerReviews = await this.taskRepo.find({
+        assignedTo: user,
+        status: TaskStatusEnum.COMPLETED,
+        rating: { $ne: null },
+      });
+
+      // Get reviews where user was the poster (received rating from runner)
+      const posterReviews = await this.taskRepo.find({
+        postedBy: user,
+        status: TaskStatusEnum.COMPLETED,
+        posterRating: { $ne: null },
+      });
+
+      // Calculate average rating
+      const allRatings = [
+        ...runnerReviews.map((t) => t.rating!),
+        ...posterReviews.map((t) => t.posterRating!),
+      ];
+
+      const avgRating =
+        allRatings.length > 0
+          ? parseFloat((allRatings.reduce((sum, r) => sum + r, 0) / allRatings.length).toFixed(1))
+          : 0;
+
+      profile.rating = avgRating;
+      profile.totalReviews = allRatings.length;
+    }
+
+    // Conditionally add completed tasks count
+    if (user.showCompletedTasksCount ?? true) {
+      const completedTasks = await this.taskRepo.count({
+        assignedTo: user,
+        status: TaskStatusEnum.COMPLETED,
+      });
+
+      profile.completedTasksCount = completedTasks;
+    }
+
+    // Calculate on-time rate (always show for runners)
+    const totalCompletedAsRunner = await this.taskRepo.count({
+      assignedTo: user,
+      status: TaskStatusEnum.COMPLETED,
+    });
+
+    if (totalCompletedAsRunner > 0) {
+      // Count tasks completed on time (completed at or before deadline)
+      // For now, we'll use a simple metric - tasks that weren't disputed
+      const tasksNotDisputed = await this.taskRepo.count({
+        assignedTo: user,
+        status: TaskStatusEnum.COMPLETED,
+        disputeReason: null,
+      });
+
+      profile.onTimeRate = parseFloat(((tasksNotDisputed / totalCompletedAsRunner) * 100).toFixed(1));
+    } else {
+      profile.onTimeRate = 0;
+    }
+
+    // Calculate response rate (always show)
+    // Response rate = tasks with bids / total open tasks posted
+    // This is a simplified metric
+    const totalTasksPosted = await this.taskRepo.count({
+      postedBy: user,
+    });
+
+    if (totalTasksPosted > 0) {
+      // For simplicity, we'll use 100% as default since we don't track response times yet
+      // TODO: Implement proper response rate tracking
+      profile.responseRate = 100;
+    } else {
+      profile.responseRate = 0;
+    }
+
+    return profile;
   }
 }

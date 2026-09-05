@@ -57,6 +57,76 @@ export class TasksService {
     private readonly em: EntityManager,
   ) {}
 
+  // Helper method to serialize user for public consumption
+  private async serializePublicUser(user: User | null | undefined): Promise<any> {
+    if (!user) return null;
+
+    // Extract values before building object to ensure no entity references
+    const uuid = user.uuid || `user-${user.id}`; // Fallback if uuid is missing
+    const firstName = user.firstName;
+    const lastName = user.lastName;
+    const registeredAs = user.registeredAs;
+    const showRating = user.showRating ?? false;
+    const showLocation = user.showLocation ?? false;
+    const showCompletedTasksCount = user.showCompletedTasksCount ?? false;
+
+    // Create plain object with only public fields
+    const publicUser: any = {
+      uuid,
+      firstName,
+      lastName,
+      registeredAs,
+      createdAt: user.createdAt,
+    };
+
+    // Get tasks posted count (always show for transparency)
+    const tasksPostedCount = await this.taskRepo.count({
+      postedBy: user,
+    });
+    publicUser.tasksPosted = tasksPostedCount;
+
+    // Only include profile visibility fields if they're explicitly allowed
+    if (showRating) {
+      // Get reviews for rating calculation
+      const runnerReviews = await this.taskRepo.find({
+        assignedTo: user,
+        status: TaskStatusEnum.COMPLETED,
+        rating: { $ne: null },
+      });
+
+      const posterReviews = await this.taskRepo.find({
+        postedBy: user,
+        status: TaskStatusEnum.COMPLETED,
+        posterRating: { $ne: null },
+      });
+
+      const allRatings = [
+        ...runnerReviews.map((t) => t.rating!),
+        ...posterReviews.map((t) => t.posterRating!),
+      ];
+
+      const avgRating =
+        allRatings.length > 0
+          ? parseFloat((allRatings.reduce((sum, r) => sum + r, 0) / allRatings.length).toFixed(1))
+          : 0;
+
+      publicUser.rating = avgRating;
+      publicUser.totalReviews = allRatings.length;
+    }
+    if (showLocation && user.city) {
+      publicUser.city = user.city;
+    }
+    if (showCompletedTasksCount) {
+      const completedTasks = await this.taskRepo.count({
+        assignedTo: user,
+        status: TaskStatusEnum.COMPLETED,
+      });
+      publicUser.completedTasksCount = completedTasks;
+    }
+
+    return publicUser;
+  }
+
   async create(createTaskDto: CreateTaskDto, currentUser: User) {
     const category = await this.taskCategoryRepo.findOne({
       id: createTaskDto?.categoryId,
@@ -89,7 +159,7 @@ export class TasksService {
   }
 
   async findAll() {
-    return await this.taskRepo.find(
+    const tasks = await this.taskRepo.find(
       {
         status: TaskStatusEnum.OPEN,
       },
@@ -97,6 +167,25 @@ export class TasksService {
         populate: ['category', 'postedBy'],
       },
     );
+
+    return Promise.all(tasks.map(async task => ({
+      id: task.id,
+      publicId: task.publicId,
+      title: task.title,
+      description: task.description,
+      location: task.location,
+      reward: task.reward,
+      urgency: task.urgency,
+      requirements: task.requirements,
+      status: task.status,
+      createdAt: task.createdAt,
+      category: {
+        id: task.category.id,
+        name: task.category.name,
+        description: task.category.description,
+      },
+      postedBy: await this.serializePublicUser(task.postedBy),
+    })));
   }
 
   async findOne(id: number) {
@@ -116,17 +205,41 @@ export class TasksService {
       throw new NotFoundException('Task not found');
     }
 
+    // Build explicit response without spreading task to avoid leaking populated relations
+    const response = {
+      id: task.id,
+      publicId: task.publicId,
+      title: task.title,
+      description: task.description,
+      location: task.location,
+      reward: task.reward,
+      urgency: task.urgency,
+      requirements: task.requirements,
+      status: task.status,
+      rating: task.rating,
+      feedback: task.feedback,
+      posterRating: task.posterRating,
+      posterReview: task.posterReview,
+      disputeReason: task.disputeReason,
+      completedAt: task.completedAt,
+      createdAt: task.createdAt,
+      category: {
+        id: task.category.id,
+        name: task.category.name,
+        description: task.category.description,
+      },
+      postedBy: await this.serializePublicUser(task.postedBy),
+      assignedTo: await this.serializePublicUser(task.assignedTo),
+    };
+
     if (currentUser) {
       const isRunner = task.assignedTo?.id === currentUser.id;
       const isPoster = task.postedBy.id === currentUser.id;
 
-      return {
-        ...task,
-        hasReviewed: isRunner ? !!task.posterRating : isPoster ? !!task.rating : false,
-      };
+      response['hasReviewed'] = isRunner ? !!task.posterRating : isPoster ? !!task.rating : false;
     }
 
-    return task;
+    return response;
   }
 
   async update(id: string, updateTaskDto: UpdateTaskDto, currentUser: User) {
@@ -285,7 +398,14 @@ export class TasksService {
       { populate: ['createdBy'] },
     );
 
-    return taskBids;
+    return Promise.all(taskBids.map(async bid => ({
+      id: bid.id,
+      amount: bid.amount,
+      message: bid.message,
+      status: bid.status,
+      createdAt: bid.createdAt,
+      createdBy: await this.serializePublicUser(bid.createdBy),
+    })));
   }
 
   async findMyTasks(currentUser: User): Promise<MyTaskResponseDto[]> {
@@ -332,7 +452,30 @@ export class TasksService {
       { populate: ['task', 'task.category', 'task.postedBy'] },
     );
 
-    return bids;
+    return Promise.all(bids.map(async bid => ({
+      id: bid.id,
+      amount: bid.amount,
+      message: bid.message,
+      status: bid.status,
+      createdAt: bid.createdAt,
+      task: {
+        id: bid.task.id,
+        publicId: bid.task.publicId,
+        title: bid.task.title,
+        description: bid.task.description,
+        location: bid.task.location,
+        reward: bid.task.reward,
+        urgency: bid.task.urgency,
+        status: bid.task.status,
+        createdAt: bid.task.createdAt,
+        category: {
+          id: bid.task.category.id,
+          name: bid.task.category.name,
+          description: bid.task.category.description,
+        },
+        postedBy: await this.serializePublicUser(bid.task.postedBy),
+      }
+    })));
   }
 
   async getMyAssignedTasks(currentUser: User): Promise<any[]> {
@@ -341,10 +484,31 @@ export class TasksService {
       { populate: ['category', 'postedBy', 'assignedTo'] },
     );
 
-    return tasks.map((task) => ({
-      ...task,
+    return Promise.all(tasks.map(async (task) => ({
+      id: task.id,
+      publicId: task.publicId,
+      title: task.title,
+      description: task.description,
+      location: task.location,
+      reward: task.reward,
+      urgency: task.urgency,
+      requirements: task.requirements,
+      status: task.status,
+      rating: task.rating,
+      feedback: task.feedback,
+      posterRating: task.posterRating,
+      posterReview: task.posterReview,
+      completedAt: task.completedAt,
+      createdAt: task.createdAt,
+      category: {
+        id: task.category.id,
+        name: task.category.name,
+        description: task.category.description,
+      },
+      postedBy: await this.serializePublicUser(task.postedBy),
+      assignedTo: await this.serializePublicUser(task.assignedTo),
       hasReviewed: !!task.posterRating,
-    }));
+    })));
   }
 
   async counterTaskBid(
