@@ -185,7 +185,7 @@ export class ProfileService {
     };
   }
 
-  async getProfile(userId: number) {
+  async getProfile(userId: number): Promise<any> {
     const user = await this.userRepo.findOne({ id: userId });
 
     if (!user) {
@@ -241,7 +241,29 @@ export class ProfileService {
     const responseRate = tasksPosted > 0 ? 100 : 0;
 
     return {
-      ...user,
+      id: user.id,
+      uuid: user.uuid,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      phoneNumber: user.phoneNumber,
+      address: user.address,
+      city: user.city,
+      bio: user.bio,
+      registeredAs: user.registeredAs,
+      emailNotifications: user.emailNotifications,
+      pushNotifications: user.pushNotifications,
+      smsNotifications: user.smsNotifications,
+      notifyNewBids: user.notifyNewBids,
+      notifyTaskUpdates: user.notifyTaskUpdates,
+      notifyPaymentAlerts: user.notifyPaymentAlerts,
+      notifyWeeklyDigest: user.notifyWeeklyDigest,
+      notifyPromotions: user.notifyPromotions,
+      showLocation: user.showLocation,
+      showRating: user.showRating,
+      showCompletedTasksCount: user.showCompletedTasksCount,
+      allowDirectMessages: user.allowDirectMessages,
+      createdAt: user.createdAt,
       tasksPosted,
       completedTasksCount: completedTasks,
       rating: avgRating,
