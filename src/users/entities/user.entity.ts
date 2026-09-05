@@ -31,6 +31,12 @@ export class User {
   @Property()
   phoneNumber!: string;
 
+  @Property({ nullable: true })
+  address?: string;
+
+  @Property({ nullable: true, type: 'text' })
+  bio?: string;
+
   @Property()
   @Exclude()
   password!: string;

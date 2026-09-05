@@ -49,4 +49,22 @@ export class CreateUserDto {
   @IsString()
   @IsOptional()
   registeredAs?: string;
+
+  @ApiProperty({
+    example: '123 Main St, Lagos, Nigeria',
+    description: 'User address',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  address?: string;
+
+  @ApiProperty({
+    example: 'I am a professional runner with 5 years of experience',
+    description: 'User bio',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  bio?: string;
 }

@@ -1,11 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@mikro-orm/nestjs';
-import { EntityRepository } from '@mikro-orm/postgresql';
+import { EntityRepository, EntityManager } from '@mikro-orm/postgresql';
 import { User } from 'src/users/entities/user.entity';
 import { Task } from 'src/tasks/entities/task.entity';
 import { Payment } from 'src/tasks/entities/payment.entity';
 import { TaskStatusEnum } from 'src/tasks/dto/create-task.dto';
 import { PaymentStatus } from 'src/tasks/entities/payment.entity';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Injectable()
 export class ProfileService {
@@ -18,6 +19,8 @@ export class ProfileService {
 
     @InjectRepository(Payment)
     private readonly paymentRepo: EntityRepository<Payment>,
+
+    private readonly em: EntityManager,
   ) {}
 
   async getUserReviews(userId: number) {
@@ -176,5 +179,54 @@ export class ProfileService {
       tasksPosted,
       avgRating,
     };
+  }
+
+  async getProfile(userId: number): Promise<User> {
+    const user = await this.userRepo.findOne({ id: userId });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return user;
+  }
+
+  async updateProfile(userId: number, updateProfileDto: UpdateProfileDto): Promise<User> {
+    const user = await this.userRepo.findOne({ id: userId });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Check if email is being updated and if it already exists
+    if (updateProfileDto.email && updateProfileDto.email !== user.email) {
+      const existingUser = await this.userRepo.findOne({
+        email: updateProfileDto.email,
+      });
+
+      if (existingUser) {
+        throw new ConflictException('Email already in use');
+      }
+    }
+
+    // Check if phone number is being updated and if it already exists
+    if (updateProfileDto.phoneNumber && updateProfileDto.phoneNumber !== user.phoneNumber) {
+      const existingUser = await this.userRepo.findOne({
+        phoneNumber: updateProfileDto.phoneNumber,
+      });
+
+      if (existingUser) {
+        throw new ConflictException('Phone number already in use');
+      }
+    }
+
+    // Filter out undefined values to avoid assignment errors
+    const filteredDto = Object.fromEntries(
+      Object.entries(updateProfileDto).filter(([_, value]) => value !== undefined)
+    );
+
+    this.userRepo.assign(user, filteredDto);
+    await this.em.flush();
+    return user;
   }
 }

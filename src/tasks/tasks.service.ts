@@ -190,7 +190,13 @@ export class TasksService {
     const existingBid = await this.taskBidRepo.findOne({
       task,
       createdBy: currentUser?.id,
-      status: TaskBidStatus.PENDING,
+      status: {
+        $in: [
+          TaskBidStatus.PENDING,
+          TaskBidStatus.COUNTERED_BY_CLIENT,
+          TaskBidStatus.COUNTERED_BY_RUNNER,
+        ],
+      },
     });
 
     if (existingBid) {
