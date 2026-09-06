@@ -20,6 +20,8 @@ async function bootstrap() {
   app.enableCors({
     origin: process.env.FRONTEND_URL, // e.g. http://localhost:9001
     credentials: true, // 👈 allow cookies
+    allowedHeaders: ['Content-Type', 'Authorization'], // Allow Authorization header
+    exposedHeaders: ['Set-Cookie'], // Expose Set-Cookie for clients
   });
 
   const reflector = app.get(Reflector);

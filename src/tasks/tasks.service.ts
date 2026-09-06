@@ -643,9 +643,9 @@ export class TasksService {
         createdAt: negotiation.createdAt,
         createdBy: {
           id: negotiation.createdBy.id,
+          uuid: negotiation.createdBy.uuid,
           firstName: negotiation.createdBy.firstName,
           lastName: negotiation.createdBy.lastName,
-          email: negotiation.createdBy.email,
         },
       })),
     };

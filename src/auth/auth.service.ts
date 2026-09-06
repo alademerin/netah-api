@@ -1,8 +1,4 @@
-import {
-  ConflictException,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { CreateAuthDto } from './dto/create-auth.dto';
 import { UsersService } from 'src/users/users.service';
 import { JwtService } from '@nestjs/jwt';
@@ -19,15 +15,10 @@ export class AuthService {
   ) {}
 
   async login(createAuthDto: CreateAuthDto, res: Response) {
-    const user = await this.usersService.findOneByEmailWithPassword(
-      createAuthDto.email,
-    );
+    const user = await this.usersService.findOneByEmailWithPassword(createAuthDto.email);
     if (!user) throw new UnauthorizedException('Invalid Credentials');
 
-    const passwordMatch = await bcrypt.compare(
-      createAuthDto.password,
-      user.password,
-    );
+    const passwordMatch = await bcrypt.compare(createAuthDto.password, user.password);
     if (!passwordMatch) throw new UnauthorizedException('Invalid Credentials');
 
     const payload = {
@@ -39,20 +30,19 @@ export class AuthService {
     const isProd = process.env.NODE_ENV === 'production';
 
     res.cookie('access_token', token, {
-      httpOnly: false,
+      httpOnly: true,
       secure: isProd,
       sameSite: isProd ? 'none' : 'lax',
-      maxAge: 1000 * 60 * 60 * 24 * 7,
+      maxAge: 1000 * 60 * 60 * 24 * 30, // 30 days
     });
+
+    // Return token in body for mobile/incognito clients that can't persist cookies
+    return { access_token: token };
   }
 
   async register(signupDto: CreateUserDto, res: Response) {
-    const existingEmail = await this.usersService.findOneByEmailWithPassword(
-      signupDto.email,
-    );
-    const existingPhone = await this.usersService.findOneByPhoneNumber(
-      signupDto.phoneNumber,
-    );
+    const existingEmail = await this.usersService.findOneByEmailWithPassword(signupDto.email);
+    const existingPhone = await this.usersService.findOneByPhoneNumber(signupDto.phoneNumber);
 
     if (existingEmail || existingPhone)
       throw new ConflictException(
@@ -70,11 +60,14 @@ export class AuthService {
     const isProd = process.env.NODE_ENV === 'production';
 
     res.cookie('access_token', token, {
-      httpOnly: false,
+      httpOnly: true,
       secure: isProd,
       sameSite: isProd ? 'none' : 'lax',
-      maxAge: 1000 * 60 * 60 * 24 * 7,
+      maxAge: 1000 * 60 * 60 * 24 * 30, // 30 days
     });
+
+    // Return token in body for mobile/incognito clients that can't persist cookies
+    return { access_token: token };
   }
 
   async getMe(user: User) {

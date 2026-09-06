@@ -68,6 +68,7 @@ export class ProfileService {
       review: task.feedback,
       reviewedBy: {
         id: task.postedBy.id,
+        uuid: task.postedBy.uuid,
         firstName: task.postedBy.firstName,
         lastName: task.postedBy.lastName,
       },
@@ -83,6 +84,7 @@ export class ProfileService {
       review: task.posterReview,
       reviewedBy: {
         id: task.assignedTo!.id,
+        uuid: task.assignedTo!.uuid,
         firstName: task.assignedTo!.firstName,
         lastName: task.assignedTo!.lastName,
       },
