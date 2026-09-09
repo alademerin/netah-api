@@ -160,16 +160,19 @@ export class TasksService {
     return task;
   }
 
-  async findAll(currentUser: User) {
-    const tasks = await this.taskRepo.find(
-      {
-        status: TaskStatusEnum.OPEN,
-        postedBy: { $ne: currentUser.id },
-      },
-      {
-        populate: ['category', 'postedBy'],
-      },
-    );
+  async findAll(currentUser?: User) {
+    const filter: any = {
+      status: TaskStatusEnum.OPEN,
+    };
+
+    // If user is logged in, exclude their own tasks
+    if (currentUser) {
+      filter.postedBy = { $ne: currentUser.id };
+    }
+
+    const tasks = await this.taskRepo.find(filter, {
+      populate: ['category', 'postedBy'],
+    });
 
     return Promise.all(tasks.map(async task => ({
       id: task.id,

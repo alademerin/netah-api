@@ -24,9 +24,8 @@ export class TasksController {
     return this.tasksService.create(createTaskDto, currentUser);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get()
-  findAll(@CurrentUser() currentUser: User) {
+  findAll(@CurrentUser() currentUser?: User) {
     return this.tasksService.findAll(currentUser);
   }
 
