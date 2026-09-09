@@ -5,6 +5,7 @@ import {
   Filter,
   PrimaryKey,
   Property,
+  EventArgs,
 } from '@mikro-orm/core';
 import { Exclude } from 'class-transformer';
 import * as bcrypt from 'bcrypt';
@@ -43,6 +44,15 @@ export class User {
 
   @Property({ nullable: true, type: 'text' })
   bio?: string;
+
+  @Property({ type: 'json', nullable: true })
+  skills?: string[];
+
+  @Property({ nullable: true })
+  profileImage?: string;
+
+  @Property({ nullable: true })
+  profileImagePublicId?: string;
 
   @Property()
   @Exclude()
@@ -94,6 +104,12 @@ export class User {
   createdAt?: Date;
 
   @Property({ nullable: true })
+  passwordResetOtp?: string;
+
+  @Property({ nullable: true })
+  passwordResetOtpExpiry?: Date;
+
+  @Property({ nullable: true })
   deletedAt?: Date;
 
   @BeforeCreate()
@@ -104,9 +120,17 @@ export class User {
   }
 
   @BeforeCreate()
-  @BeforeUpdate()
-  async hashPassword() {
+  async hashPasswordOnCreate() {
     if (this.password) {
+      this.password = await bcrypt.hash(this.password, 10);
+    }
+  }
+
+  @BeforeUpdate()
+  async hashPasswordOnUpdate(args: EventArgs<User>) {
+    // Only hash if password field was modified
+    const payload = args.changeSet?.payload;
+    if (payload && 'password' in payload && this.password) {
       this.password = await bcrypt.hash(this.password, 10);
     }
   }

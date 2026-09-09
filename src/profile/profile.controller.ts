@@ -1,4 +1,17 @@
-import { Controller, Get, Param, UseGuards, Patch, Body, Post } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  UseGuards,
+  Patch,
+  Body,
+  Post,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
+  Delete,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ProfileService } from './profile.service';
 import { ResponseMessage } from 'src/response/response.decorator';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
@@ -28,6 +41,38 @@ export class ProfileController {
     @Body() updateProfileDto: UpdateProfileDto,
   ) {
     return this.profileService.updateProfile(currentUser.id, updateProfileDto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ResponseMessage('Profile image uploaded successfully!')
+  @Post('me/upload-image')
+  @UseInterceptors(FileInterceptor('image'))
+  async uploadProfileImage(
+    @CurrentUser() currentUser: User,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    const allowedMimes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
+    if (!allowedMimes.includes(file.mimetype)) {
+      throw new BadRequestException('Only image files (jpeg, png, jpg, webp) are allowed');
+    }
+
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      throw new BadRequestException('File size must be less than 5MB');
+    }
+
+    return this.profileService.uploadProfileImage(currentUser.id, file);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ResponseMessage('Profile image deleted successfully!')
+  @Delete('me/delete-image')
+  deleteProfileImage(@CurrentUser() currentUser: User) {
+    return this.profileService.deleteProfileImage(currentUser.id);
   }
 
   @UseGuards(JwtAuthGuard)

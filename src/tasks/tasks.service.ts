@@ -77,6 +77,8 @@ export class TasksService {
       lastName,
       registeredAs,
       createdAt: user.createdAt,
+      skills: user.skills || [],
+      profileImage: user.profileImage,
     };
 
     // Get tasks posted count (always show for transparency)

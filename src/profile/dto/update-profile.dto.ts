@@ -4,6 +4,7 @@ import {
   IsString,
   IsOptional,
   Matches,
+  IsArray,
 } from 'class-validator';
 
 export class UpdateProfileDto {
@@ -70,4 +71,15 @@ export class UpdateProfileDto {
   @IsString()
   @IsOptional()
   bio?: string;
+
+  @ApiProperty({
+    example: ['Grocery Shopping', 'Package Delivery', 'Pet Care'],
+    description: 'User skills/services offered',
+    required: false,
+    type: [String],
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  skills?: string[];
 }

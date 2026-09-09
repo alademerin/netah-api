@@ -10,6 +10,7 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { UpdateNotificationPreferencesDto } from './dto/update-notification-preferences.dto';
 import { UpdateProfileVisibilityDto } from './dto/update-profile-visibility.dto';
+import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -25,6 +26,7 @@ export class ProfileService {
     private readonly paymentRepo: EntityRepository<Payment>,
 
     private readonly em: EntityManager,
+    private readonly cloudinaryService: CloudinaryService,
   ) {}
 
   async getUserReviews(userUuid: string) {
@@ -252,6 +254,8 @@ export class ProfileService {
       address: user.address,
       city: user.city,
       bio: user.bio,
+      skills: user.skills || [],
+      profileImage: user.profileImage,
       registeredAs: user.registeredAs,
       emailNotifications: user.emailNotifications,
       pushNotifications: user.pushNotifications,
@@ -444,6 +448,8 @@ export class ProfileService {
       firstName: user.firstName,
       lastName: user.lastName,
       bio: user.bio,
+      skills: user.skills || [],
+      profileImage: user.profileImage,
       registeredAs: user.registeredAs,
       createdAt: user.createdAt,
       allowDirectMessages: user.allowDirectMessages ?? true,
@@ -457,6 +463,7 @@ export class ProfileService {
 
     // Conditionally add location
     if (user.showLocation ?? true) {
+      profile.address = user.address;
       profile.city = user.city;
     }
 
@@ -537,5 +544,54 @@ export class ProfileService {
     }
 
     return profile;
+  }
+
+  async uploadProfileImage(userId: number, file: Express.Multer.File) {
+    const user = await this.userRepo.findOne(userId);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Delete old image from Cloudinary if exists
+    if (user.profileImagePublicId) {
+      await this.cloudinaryService.deleteImage(user.profileImagePublicId);
+    }
+
+    // Upload new image
+    const { url, publicId } = await this.cloudinaryService.uploadImage(file, 'netah/profiles');
+
+    // Update user
+    user.profileImage = url;
+    user.profileImagePublicId = publicId;
+    await this.em.flush();
+
+    return {
+      profileImage: url,
+    };
+  }
+
+  async deleteProfileImage(userId: number) {
+    const user = await this.userRepo.findOne(userId);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (!user.profileImage) {
+      throw new NotFoundException('No profile image to delete');
+    }
+
+    // Delete from Cloudinary
+    if (user.profileImagePublicId) {
+      await this.cloudinaryService.deleteImage(user.profileImagePublicId);
+    }
+
+    // Clear from database
+    user.profileImage = undefined;
+    user.profileImagePublicId = undefined;
+    await this.em.flush();
+
+    return {
+      message: 'Profile image deleted successfully',
+    };
   }
 }

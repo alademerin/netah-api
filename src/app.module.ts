@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { TasksModule } from './tasks/tasks.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ProfileModule } from './profile/profile.module';
+import { EmailModule } from './email/email.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { ProfileModule } from './profile/profile.module';
     TasksModule,
     NotificationsModule,
     ProfileModule,
+    EmailModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -193,6 +193,7 @@
           "primary": false,
           "nullable": false,
           "length": 255,
+          "default": "uuid_generate_v4()",
           "mappedType": "string"
         },
         "email": {
@@ -263,6 +264,35 @@
           "primary": false,
           "nullable": true,
           "mappedType": "text"
+        },
+        "skills": {
+          "name": "skills",
+          "type": "jsonb",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "mappedType": "json"
+        },
+        "profile_image": {
+          "name": "profile_image",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "profile_image_public_id": {
+          "name": "profile_image_public_id",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
         },
         "password": {
           "name": "password",
@@ -411,6 +441,26 @@
           "autoincrement": false,
           "primary": false,
           "nullable": false,
+          "length": 6,
+          "mappedType": "datetime"
+        },
+        "password_reset_otp": {
+          "name": "password_reset_otp",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "password_reset_otp_expiry": {
+          "name": "password_reset_otp_expiry",
+          "type": "timestamptz",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
           "length": 6,
           "mappedType": "datetime"
         },
