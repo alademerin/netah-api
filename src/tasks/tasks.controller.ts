@@ -24,9 +24,10 @@ export class TasksController {
     return this.tasksService.create(createTaskDto, currentUser);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get()
-  findAll() {
-    return this.tasksService.findAll();
+  findAll(@CurrentUser() currentUser: User) {
+    return this.tasksService.findAll(currentUser);
   }
 
   @ResponseMessage('Task category retrieved successfully!')

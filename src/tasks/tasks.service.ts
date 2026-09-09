@@ -160,10 +160,11 @@ export class TasksService {
     return task;
   }
 
-  async findAll() {
+  async findAll(currentUser: User) {
     const tasks = await this.taskRepo.find(
       {
         status: TaskStatusEnum.OPEN,
+        postedBy: { $ne: currentUser.id },
       },
       {
         populate: ['category', 'postedBy'],
