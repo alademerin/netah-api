@@ -572,19 +572,15 @@
           "nullable": false,
           "mappedType": "integer"
         },
-        "urgency": {
-          "name": "urgency",
-          "type": "text",
+        "deadline": {
+          "name": "deadline",
+          "type": "timestamptz",
           "unsigned": false,
           "autoincrement": false,
           "primary": false,
           "nullable": false,
-          "enumItems": [
-            "ASAP",
-            "FLEXIBLE",
-            "TODAY"
-          ],
-          "mappedType": "enum"
+          "length": 6,
+          "mappedType": "datetime"
         },
         "status": {
           "name": "status",
@@ -623,8 +619,8 @@
           "nullable": true,
           "mappedType": "json"
         },
-        "photos": {
-          "name": "photos",
+        "images": {
+          "name": "images",
           "type": "jsonb",
           "unsigned": false,
           "autoincrement": false,

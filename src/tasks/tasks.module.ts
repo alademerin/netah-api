@@ -10,11 +10,13 @@ import { TaskBidNegotiation } from './entities/task-bid-negotiation.entity';
 import { Payment } from './entities/payment.entity';
 import { SystemSettings } from './entities/system-settings.entity';
 import { NotificationsModule } from 'src/notifications/notifications.module';
+import { CloudinaryModule } from 'src/cloudinary/cloudinary.module';
 
 @Module({
   imports: [
     MikroOrmModule.forFeature([TaskCategory, Task, TaskBid, TaskBidNegotiation, Payment, SystemSettings, User]),
     NotificationsModule,
+    CloudinaryModule,
   ],
   controllers: [TasksController],
   providers: [TasksService],

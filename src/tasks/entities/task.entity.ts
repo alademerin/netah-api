@@ -9,7 +9,7 @@ import {
   PrimaryKey,
   Property,
 } from '@mikro-orm/core';
-import { TaskStatusEnum, TaskUrgencyEnum } from '../dto/create-task.dto';
+import { TaskStatusEnum } from '../dto/create-task.dto';
 import { TaskCategory } from './task-category.entity';
 import { User } from 'src/users/entities/user.entity';
 import { Exclude } from 'class-transformer';
@@ -42,8 +42,8 @@ export class Task {
   @Property()
   reward!: number;
 
-  @Enum(() => TaskUrgencyEnum)
-  urgency!: TaskUrgencyEnum;
+  @Property()
+  deadline!: Date;
 
   @Enum(() => TaskStatusEnum)
   status: TaskStatusEnum = TaskStatusEnum.OPEN;
@@ -55,7 +55,7 @@ bidsCount: number & Opt = 0;
   requirements?: string[];
 
   @Property({ type: 'json', default: [] })
-  photos?: string[];
+  images?: Array<{ url: string; publicId: string }>;
 
   @ManyToOne(() => TaskCategory)
   category!: TaskCategory;

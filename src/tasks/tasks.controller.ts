@@ -1,4 +1,17 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
@@ -7,6 +20,7 @@ import { ResponseMessage } from 'src/response/response.decorator';
 import { CurrentUser } from 'src/auth/decorators/current-user-decorator';
 import { User } from 'src/users/entities/user.entity';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from 'src/auth/guards/optional-jwt-auth.guard';
 import { CreateTaskBidDto } from './dto/create-task-bid.dto';
 import { CounterTaskBidDto } from './dto/counter-task-bid.dto';
 import { ApproveTaskDto } from './dto/approve-task.dto';
@@ -24,6 +38,7 @@ export class TasksController {
     return this.tasksService.create(createTaskDto, currentUser);
   }
 
+  @UseGuards(OptionalJwtAuthGuard)
   @Get()
   findAll(@CurrentUser() currentUser?: User) {
     return this.tasksService.findAll(currentUser);
@@ -61,6 +76,7 @@ export class TasksController {
     return this.tasksService.remove(+id);
   }
 
+  @UseGuards(OptionalJwtAuthGuard)
   @Get(':id')
   findOneByUuid(@Param('id') id: string, @CurrentUser() currentUser?: User): Promise<any> {
     return this.tasksService.findOneByUuid(id, currentUser);
@@ -75,6 +91,43 @@ export class TasksController {
     @CurrentUser() currentUser: User,
   ) {
     return this.tasksService.update(id, updateTaskDto, currentUser);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ResponseMessage('Task image uploaded successfully!')
+  @Post(':id/images')
+  @UseInterceptors(FileInterceptor('image'))
+  async uploadTaskImage(
+    @Param('id') id: string,
+    @CurrentUser() currentUser: User,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    const allowedMimes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
+    if (!allowedMimes.includes(file.mimetype)) {
+      throw new BadRequestException('Only image files (jpeg, png, jpg, webp) are allowed');
+    }
+
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      throw new BadRequestException('File size must be less than 5MB');
+    }
+
+    return this.tasksService.uploadTaskImage(id, currentUser, file);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ResponseMessage('Task image deleted successfully!')
+  @Delete(':id/images/:imageIndex')
+  deleteTaskImage(
+    @Param('id') id: string,
+    @Param('imageIndex') imageIndex: string,
+    @CurrentUser() currentUser: User,
+  ) {
+    return this.tasksService.deleteTaskImage(id, +imageIndex, currentUser);
   }
 
   @UseGuards(JwtAuthGuard)

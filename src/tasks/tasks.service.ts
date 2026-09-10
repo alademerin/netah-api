@@ -5,7 +5,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { CreateTaskDto, TaskStatusEnum, TaskUrgencyEnum } from './dto/create-task.dto';
+import { CreateTaskDto, TaskStatusEnum } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { CreateTaskCategoryDto } from './dto/create-task-category.dto';
 import { InjectRepository } from '@mikro-orm/nestjs';
@@ -26,6 +26,7 @@ import { Payment, PaymentStatus } from './entities/payment.entity';
 import { SystemSettings } from './entities/system-settings.entity';
 import { NotificationType } from './entities/notification.entity';
 import { NotificationsService } from 'src/notifications/notifications.service';
+import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
@@ -53,6 +54,7 @@ export class TasksService {
     private readonly userRepo: EntityRepository<User>,
 
     private readonly notificationsService: NotificationsService,
+    private readonly cloudinaryService: CloudinaryService,
 
     private readonly em: EntityManager,
   ) {}
@@ -149,7 +151,7 @@ export class TasksService {
       description: createTaskDto.description,
       location: createTaskDto.location,
       reward: createTaskDto.reward,
-      urgency: createTaskDto.urgency ?? TaskUrgencyEnum.FLEXIBLE,
+      deadline: new Date(createTaskDto.deadline),
       requirements: createTaskDto.requirements,
       status: TaskStatusEnum.OPEN,
       category,
@@ -163,6 +165,8 @@ export class TasksService {
   async findAll(currentUser?: User) {
     const filter: any = {
       status: TaskStatusEnum.OPEN,
+      deadline: { $gte: new Date() }, // Only show tasks that haven't expired
+      assignedTo: null, // Only show unassigned tasks
     };
 
     // If user is logged in, exclude their own tasks
@@ -181,8 +185,9 @@ export class TasksService {
       description: task.description,
       location: task.location,
       reward: task.reward,
-      urgency: task.urgency,
+      deadline: task.deadline,
       requirements: task.requirements,
+      images: (task.images || []).map(img => img.url),
       status: task.status,
       createdAt: task.createdAt,
       category: {
@@ -211,6 +216,20 @@ export class TasksService {
       throw new NotFoundException('Task not found');
     }
 
+    // If task is assigned, only poster and assignedTo can view
+    if (task.assignedTo) {
+      if (!currentUser) {
+        throw new UnauthorizedException('Task not available');
+      }
+
+      const isPoster = task.postedBy.id === currentUser.id;
+      const isAssignee = task.assignedTo.id === currentUser.id;
+
+      if (!isPoster && !isAssignee) {
+        throw new NotFoundException('Task not found');
+      }
+    }
+
     // Build explicit response without spreading task to avoid leaking populated relations
     const response = {
       id: task.id,
@@ -219,8 +238,9 @@ export class TasksService {
       description: task.description,
       location: task.location,
       reward: task.reward,
-      urgency: task.urgency,
+      deadline: task.deadline,
       requirements: task.requirements,
+      images: (task.images || []).map(img => img.url),
       status: task.status,
       rating: task.rating,
       feedback: task.feedback,
@@ -431,7 +451,7 @@ export class TasksService {
           description: task.description,
           location: task.location,
           reward: task.reward,
-          urgency: task.urgency,
+          deadline: task.deadline,
           status: task.status,
           createdAt: task.createdAt,
           bidCount,
@@ -471,7 +491,7 @@ export class TasksService {
         description: bid.task.description,
         location: bid.task.location,
         reward: bid.task.reward,
-        urgency: bid.task.urgency,
+        deadline: bid.task.deadline,
         status: bid.task.status,
         createdAt: bid.task.createdAt,
         category: {
@@ -497,7 +517,7 @@ export class TasksService {
       description: task.description,
       location: task.location,
       reward: task.reward,
-      urgency: task.urgency,
+      deadline: task.deadline,
       requirements: task.requirements,
       status: task.status,
       rating: task.rating,
@@ -1263,6 +1283,70 @@ export class TasksService {
     return {
       task,
       message: 'Review submitted successfully',
+    };
+  }
+
+  async uploadTaskImage(publicId: string, currentUser: User, file: Express.Multer.File) {
+    const task = await this.taskRepo.findOne({ publicId }, { populate: ['postedBy'] });
+
+    if (!task) {
+      throw new NotFoundException('Task not found');
+    }
+
+    if (task.postedBy.id !== currentUser.id) {
+      throw new UnauthorizedException('Only task poster can upload images');
+    }
+
+    if (task.status !== TaskStatusEnum.OPEN) {
+      throw new BadRequestException('Can only upload images for open tasks');
+    }
+
+    // Upload to Cloudinary
+    const { url, publicId: imagePublicId } = await this.cloudinaryService.uploadImage(
+      file,
+      'netah/tasks',
+    );
+
+    // Add to task images array
+    if (!task.images) {
+      task.images = [];
+    }
+    task.images.push({ url, publicId: imagePublicId });
+
+    await this.em.flush();
+
+    return {
+      image: url,
+      message: 'Image uploaded successfully',
+    };
+  }
+
+  async deleteTaskImage(publicId: string, imageIndex: number, currentUser: User) {
+    const task = await this.taskRepo.findOne({ publicId }, { populate: ['postedBy'] });
+
+    if (!task) {
+      throw new NotFoundException('Task not found');
+    }
+
+    if (task.postedBy.id !== currentUser.id) {
+      throw new UnauthorizedException('Only task poster can delete images');
+    }
+
+    if (!task.images || !task.images[imageIndex]) {
+      throw new NotFoundException('Image not found');
+    }
+
+    // Delete from Cloudinary
+    const image = task.images[imageIndex];
+    await this.cloudinaryService.deleteImage(image.publicId);
+
+    // Remove from array
+    task.images.splice(imageIndex, 1);
+
+    await this.em.flush();
+
+    return {
+      message: 'Image deleted successfully',
     };
   }
 }

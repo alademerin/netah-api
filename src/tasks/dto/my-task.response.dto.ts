@@ -1,4 +1,4 @@
-import { TaskStatusEnum, TaskUrgencyEnum } from './create-task.dto';
+import { TaskStatusEnum } from './create-task.dto';
 
 export class MyTaskResponseDto {
   id!: number;
@@ -7,7 +7,7 @@ export class MyTaskResponseDto {
   description!: string;
   location!: string;
   reward!: number;
-  urgency!: TaskUrgencyEnum;
+  deadline!: Date;
   status!: TaskStatusEnum;
   bidCount!: number;
   hasReviewed!: boolean;

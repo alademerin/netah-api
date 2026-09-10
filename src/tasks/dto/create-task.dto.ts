@@ -8,13 +8,8 @@ import {
   IsArray,
   IsOptional,
   Min,
+  IsDateString,
 } from 'class-validator';
-
-export enum TaskUrgencyEnum {
-  ASAP = 'ASAP',
-  FLEXIBLE = 'FLEXIBLE',
-  TODAY = 'TODAY',
-}
 
 export enum TaskStatusEnum {
   OPEN = 'OPEN',
@@ -68,16 +63,16 @@ export class CreateTaskDto {
   categoryId!: number;
 
   @ApiProperty({
-    example: 'ASAP',
-    description: 'How quickly do you want the task to be completed',
-    required: false,
+    example: '2026-12-31T23:59:59Z',
+    description: 'Task deadline - when the task must be completed by',
   })
-  @IsEnum(TaskUrgencyEnum, { message: 'Must be a valid enum' })
-  urgency?: TaskUrgencyEnum;
+  @IsDateString()
+  @IsNotEmpty()
+  deadline!: string;
 
   @ApiProperty({
-    example: 'ASAP',
-    description: 'How quickly do you want the task to be completed',
+    example: 'OPEN',
+    description: 'Task status',
     required: false,
   })
   @IsEnum(TaskStatusEnum, { message: 'Must be a valid enum' })
@@ -92,14 +87,4 @@ export class CreateTaskDto {
   @IsArray()
   @IsString({ each: true })
   requirements?: string[];
-
-  @ApiProperty({
-    example: [''],
-    description: 'Visual aids for the task runner',
-    required: false,
-  })
-  @IsOptional()
-  @IsArray({})
-  @IsString({ each: true })
-  photos?: string[];
 }
