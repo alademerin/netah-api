@@ -27,6 +27,7 @@ import { SystemSettings } from './entities/system-settings.entity';
 import { NotificationType } from './entities/notification.entity';
 import { NotificationsService } from 'src/notifications/notifications.service';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
+import { PaystackService } from './paystack.service';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
@@ -55,6 +56,7 @@ export class TasksService {
 
     private readonly notificationsService: NotificationsService,
     private readonly cloudinaryService: CloudinaryService,
+    private readonly paystackService: PaystackService,
 
     private readonly em: EntityManager,
   ) {}
@@ -826,29 +828,98 @@ export class TasksService {
 
     const totalAmount = bidAmount + serviceCharge;
 
-    // Create mock payment
+    // Generate payment reference
+    const paymentReference = this.paystackService.generateReference('NETAH');
+
+    // Create pending payment
     const payment = this.paymentRepo.create({
       taskBid,
       paidBy: currentUser,
       bidAmount,
       serviceCharge,
       totalAmount,
-      paymentReference: `MOCK-${uuidv4()}`,
-      status: PaymentStatus.COMPLETED,
-      completedAt: new Date(),
+      paymentReference,
+      status: PaymentStatus.PENDING,
     });
+
+    // Update task status to AWAITING_PAYMENT
+    task.status = TaskStatusEnum.AWAITING_PAYMENT;
+
+    await this.em.persistAndFlush([payment, task]);
+
+    // Initialize Paystack transaction
+    const paystackResponse = await this.paystackService.initializeTransaction({
+      email: currentUser.email,
+      amount: Math.round(totalAmount * 100), // Convert to kobo
+      reference: paymentReference,
+      metadata: {
+        taskId: task.id,
+        taskPublicId: task.publicId,
+        bidId: taskBid.id,
+        userId: currentUser.id,
+        bidAmount,
+        serviceCharge,
+      },
+    });
+
+    return {
+      message: 'Payment initialized successfully',
+      payment: {
+        id: payment.id,
+        bidAmount: payment.bidAmount,
+        serviceCharge: payment.serviceCharge,
+        totalAmount: payment.totalAmount,
+        paymentReference: payment.paymentReference,
+        status: payment.status,
+      },
+      paymentUrl: paystackResponse.data.authorization_url,
+      accessCode: paystackResponse.data.access_code,
+    };
+  }
+
+  async verifyPayment(reference: string): Promise<any> {
+    // Verify transaction with Paystack
+    const paystackVerification = await this.paystackService.verifyTransaction(reference);
+
+    if (!paystackVerification.status || paystackVerification.data.status !== 'success') {
+      throw new BadRequestException('Payment verification failed');
+    }
+
+    // Find payment record
+    const payment = await this.paymentRepo.findOne(
+      { paymentReference: reference },
+      { populate: ['taskBid', 'taskBid.task', 'taskBid.createdBy', 'paidBy'] },
+    );
+
+    if (!payment) {
+      throw new NotFoundException('Payment record not found');
+    }
+
+    if (payment.status === PaymentStatus.COMPLETED) {
+      return {
+        message: 'Payment already verified',
+        payment,
+      };
+    }
+
+    const taskBid = payment.taskBid;
+    const task = taskBid.task;
+
+    // Update payment status
+    payment.status = PaymentStatus.COMPLETED;
+    payment.completedAt = new Date();
 
     // Update bid status
     taskBid.status = TaskBidStatus.ACCEPTED;
 
-    // Assign task to runner
+    // Assign task to runner and mark as IN_PROGRESS
     task.assignedTo = taskBid.createdBy;
     task.status = TaskStatusEnum.IN_PROGRESS;
 
     // Auto-reject other bids
     const otherBids = await this.taskBidRepo.find({
       task,
-      id: { $ne: parsedBidId },
+      id: { $ne: taskBid.id },
       status: {
         $in: [
           TaskBidStatus.PENDING,
@@ -870,32 +941,26 @@ export class TasksService {
       taskBid.createdBy,
       NotificationType.TASK_ASSIGNED,
       'Your bid was accepted!',
-      `Your bid of ${bidAmount} on "${task.title}" was accepted. Task is now in progress.`,
+      `Your bid of ${payment.bidAmount} on "${task.title}" was accepted. Task is now in progress.`,
       task,
       taskBid,
     );
 
     // Notify client of successful task assignment
     await this.notificationsService.createNotification(
-      currentUser,
+      payment.paidBy,
       NotificationType.BID_ACCEPTED,
-      'Task assigned successfully!',
-      `You accepted ${taskBid.createdBy.firstName} ${taskBid.createdBy.lastName}'s bid of ${bidAmount} on "${task.title}". Task is now in progress.`,
+      'Payment successful!',
+      `Payment successful. ${taskBid.createdBy.firstName} ${taskBid.createdBy.lastName} has been assigned to "${task.title}". Task is now in progress.`,
       task,
       taskBid,
     );
 
     return {
+      message: 'Payment verified successfully',
+      payment,
       task,
       bid: taskBid,
-      payment: {
-        id: payment.id,
-        bidAmount: payment.bidAmount,
-        serviceCharge: payment.serviceCharge,
-        totalAmount: payment.totalAmount,
-        paymentReference: payment.paymentReference,
-        status: payment.status,
-      },
     };
   }
 

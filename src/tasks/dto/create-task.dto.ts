@@ -9,7 +9,10 @@ import {
   IsOptional,
   Min,
   IsDateString,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+import { LocationDto } from './location.dto';
 
 export enum TaskStatusEnum {
   OPEN = 'OPEN',
@@ -35,15 +38,22 @@ export class CreateTaskDto {
   })
   @IsString()
   @IsNotEmpty({ message: 'Description name is required' })
-  @MinLength(20, { message: 'Password must be at least 6 characters' })
+  @MinLength(20, { message: 'Description must be at least 20 characters' })
   description!: string;
 
   @ApiProperty({
-    example: 'Lekki Phase 1',
-    description: 'Where the user would fulfilt the task',
+    example: {
+      latitude: 6.5244,
+      longitude: 3.3792,
+      accuracy_m: 12.5,
+      source: 'gps',
+      landmark: 'Behind Total filling station, opposite GTB',
+    },
+    description: 'Location details for the task',
   })
-  @IsString()
-  location!: string;
+  @ValidateNested()
+  @Type(() => LocationDto)
+  location!: LocationDto;
 
   @ApiProperty({
     example: 10000,

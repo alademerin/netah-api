@@ -10,6 +10,9 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  Headers,
+  Req,
+  RawBodyRequest,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { TasksService } from './tasks.service';
@@ -203,7 +206,7 @@ export class TasksController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @ResponseMessage('Task bid accepted successfully!')
+  @ResponseMessage('Payment initialized. Complete payment to accept bid.')
   @Post(':id/bids/:bidId/accept')
   acceptTaskBid(
     @Param('id') id: string,
@@ -280,5 +283,32 @@ export class TasksController {
     @CurrentUser() currentUser: User,
   ) {
     return this.tasksService.reviewPoster(id, reviewPosterDto, currentUser);
+  }
+
+  @ResponseMessage('Payment verified successfully!')
+  @Post('payments/verify/:reference')
+  verifyPayment(@Param('reference') reference: string): Promise<any> {
+    return this.tasksService.verifyPayment(reference);
+  }
+
+  @Post('payments/webhook')
+  async handlePaystackWebhook(@Headers('x-paystack-signature') signature: string, @Body() body: any) {
+    // Verify webhook signature
+    const isValid = this.tasksService['paystackService'].verifyWebhookSignature(
+      signature,
+      JSON.stringify(body),
+    );
+
+    if (!isValid) {
+      throw new BadRequestException('Invalid webhook signature');
+    }
+
+    // Handle the webhook event
+    if (body.event === 'charge.success') {
+      const reference = body.data.reference;
+      await this.tasksService.verifyPayment(reference);
+    }
+
+    return { status: 'success' };
   }
 }

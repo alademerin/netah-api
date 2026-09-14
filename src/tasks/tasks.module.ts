@@ -11,6 +11,7 @@ import { Payment } from './entities/payment.entity';
 import { SystemSettings } from './entities/system-settings.entity';
 import { NotificationsModule } from 'src/notifications/notifications.module';
 import { CloudinaryModule } from 'src/cloudinary/cloudinary.module';
+import { PaystackService } from './paystack.service';
 
 @Module({
   imports: [
@@ -19,6 +20,6 @@ import { CloudinaryModule } from 'src/cloudinary/cloudinary.module';
     CloudinaryModule,
   ],
   controllers: [TasksController],
-  providers: [TasksService],
+  providers: [TasksService, PaystackService],
 })
 export class TasksModule {}
