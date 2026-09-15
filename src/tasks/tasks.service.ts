@@ -328,6 +328,11 @@ export class TasksService {
       throw new BadRequestException('You cannot bid on your own task');
     }
 
+    // Check if task deadline has passed
+    if (task.deadline && new Date(task.deadline) < new Date()) {
+      throw new BadRequestException('Cannot bid on an overdue task');
+    }
+
     const existingBid = await this.taskBidRepo.findOne({
       task,
       createdBy: currentUser?.id,
