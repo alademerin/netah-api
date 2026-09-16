@@ -40,7 +40,7 @@ export class LocationDto {
   })
   @IsOptional()
   @IsString()
-  @IsIn(['gps', 'network', 'manual'])
+  @IsIn(['gps', 'network', 'manual', 'manual_pin'])
   source?: string;
 
   @ApiProperty({
