@@ -857,6 +857,7 @@ export class TasksService {
       email: currentUser.email,
       amount: Math.round(totalAmount * 100), // Convert to kobo
       reference: paymentReference,
+      callback_url: `${process.env.FRONTEND_URL}/payment/callback?reference=${paymentReference}`,
       metadata: {
         taskId: task.id,
         taskPublicId: task.publicId,
