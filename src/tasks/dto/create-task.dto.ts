@@ -50,10 +50,12 @@ export class CreateTaskDto {
       landmark: 'Behind Total filling station, opposite GTB',
     },
     description: 'Location details for the task',
+    required: false,
   })
+  @IsOptional()
   @ValidateNested()
   @Type(() => LocationDto)
-  location!: LocationDto;
+  location?: LocationDto;
 
   @ApiProperty({
     example: 10000,

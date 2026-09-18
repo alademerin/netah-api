@@ -6,7 +6,7 @@ export class MyTaskResponseDto {
   publicId!: string;
   title!: string;
   description!: string;
-  location!: LocationDto;
+  location?: LocationDto;
   reward!: number;
   deadline!: Date;
   status!: TaskStatusEnum;

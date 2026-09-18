@@ -36,8 +36,8 @@ export class Task {
   @Property()
   description: string;
 
-  @Property({ type: 'json' })
-  location!: {
+  @Property({ type: 'json', nullable: true })
+  location?: {
     latitude: number;
     longitude: number;
     accuracy_m?: number;
