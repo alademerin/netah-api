@@ -1,25 +1,40 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Resend } from 'resend';
+import * as nodemailer from 'nodemailer';
+import { Transporter } from 'nodemailer';
 
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
-  private resend: Resend;
+  private transporter: Transporter;
   private fromEmail: string;
 
   constructor(private configService: ConfigService) {
-    const apiKey = this.configService.get<string>('RESEND_API_KEY');
-    if (!apiKey) {
-      this.logger.warn('RESEND_API_KEY not configured. Email service disabled.');
+    const smtpHost = this.configService.get<string>('SMTP_HOST');
+    const smtpPort = this.configService.get<number>('SMTP_PORT');
+    const smtpUser = this.configService.get<string>('SMTP_USER');
+    const smtpPass = this.configService.get<string>('SMTP_PASS');
+
+    if (!smtpHost || !smtpPort || !smtpUser || !smtpPass) {
+      this.logger.warn('SMTP credentials not fully configured. Email service may not work.');
     }
-    this.resend = new Resend(apiKey);
-    this.fromEmail = this.configService.get<string>('RESEND_FROM_EMAIL') || 'noreply@example.com';
+
+    this.transporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpPort === 465, // true for 465, false for other ports
+      auth: {
+        user: smtpUser,
+        pass: smtpPass,
+      },
+    });
+
+    this.fromEmail = this.configService.get<string>('SMTP_FROM_EMAIL') || 'noreply@example.com';
   }
 
   async sendWelcomeEmail(to: string, firstName: string) {
     try {
-      const { data, error } = await this.resend.emails.send({
+      const info = await this.transporter.sendMail({
         from: this.fromEmail,
         to,
         subject: 'Welcome to Netah!',
@@ -30,13 +45,8 @@ export class EmailService {
         `,
       });
 
-      if (error) {
-        this.logger.error('Failed to send welcome email', error);
-        return { success: false, error };
-      }
-
-      this.logger.log(`Welcome email sent to ${to}`);
-      return { success: true, data };
+      this.logger.log(`Welcome email sent to ${to}: ${info.messageId}`);
+      return { success: true, data: info };
     } catch (error) {
       this.logger.error('Error sending welcome email', error);
       return { success: false, error };
@@ -50,7 +60,7 @@ export class EmailService {
     taskPublicId: string,
   ) {
     try {
-      const { data, error } = await this.resend.emails.send({
+      const info = await this.transporter.sendMail({
         from: this.fromEmail,
         to,
         subject: 'Your bid was accepted!',
@@ -62,13 +72,8 @@ export class EmailService {
         `,
       });
 
-      if (error) {
-        this.logger.error('Failed to send task assigned email', error);
-        return { success: false, error };
-      }
-
-      this.logger.log(`Task assigned email sent to ${to}`);
-      return { success: true, data };
+      this.logger.log(`Task assigned email sent to ${to}: ${info.messageId}`);
+      return { success: true, data: info };
     } catch (error) {
       this.logger.error('Error sending task assigned email', error);
       return { success: false, error };
@@ -84,7 +89,7 @@ export class EmailService {
     taskPublicId: string,
   ) {
     try {
-      const { data, error } = await this.resend.emails.send({
+      const info = await this.transporter.sendMail({
         from: this.fromEmail,
         to,
         subject: 'New bid on your task',
@@ -96,13 +101,8 @@ export class EmailService {
         `,
       });
 
-      if (error) {
-        this.logger.error('Failed to send new bid email', error);
-        return { success: false, error };
-      }
-
-      this.logger.log(`New bid email sent to ${to}`);
-      return { success: true, data };
+      this.logger.log(`New bid email sent to ${to}: ${info.messageId}`);
+      return { success: true, data: info };
     } catch (error) {
       this.logger.error('Error sending new bid email', error);
       return { success: false, error };
@@ -116,7 +116,7 @@ export class EmailService {
     taskPublicId: string,
   ) {
     try {
-      const { data, error } = await this.resend.emails.send({
+      const info = await this.transporter.sendMail({
         from: this.fromEmail,
         to,
         subject: 'Task completed - awaiting approval',
@@ -129,13 +129,8 @@ export class EmailService {
         `,
       });
 
-      if (error) {
-        this.logger.error('Failed to send task completed email', error);
-        return { success: false, error };
-      }
-
-      this.logger.log(`Task completed email sent to ${to}`);
-      return { success: true, data };
+      this.logger.log(`Task completed email sent to ${to}: ${info.messageId}`);
+      return { success: true, data: info };
     } catch (error) {
       this.logger.error('Error sending task completed email', error);
       return { success: false, error };
@@ -144,7 +139,7 @@ export class EmailService {
 
   async sendPasswordResetOtp(to: string, otp: string, firstName: string) {
     try {
-      const { data, error } = await this.resend.emails.send({
+      const info = await this.transporter.sendMail({
         from: this.fromEmail,
         to,
         subject: 'Reset your password - OTP',
@@ -158,13 +153,8 @@ export class EmailService {
         `,
       });
 
-      if (error) {
-        this.logger.error('Failed to send password reset OTP', error);
-        return { success: false, error };
-      }
-
-      this.logger.log(`Password reset OTP sent to ${to}`);
-      return { success: true, data };
+      this.logger.log(`Password reset OTP sent to ${to}: ${info.messageId}`);
+      return { success: true, data: info };
     } catch (error) {
       this.logger.error('Error sending password reset OTP', error);
       return { success: false, error };
@@ -173,20 +163,15 @@ export class EmailService {
 
   async sendGenericEmail(to: string, subject: string, html: string) {
     try {
-      const { data, error } = await this.resend.emails.send({
+      const info = await this.transporter.sendMail({
         from: this.fromEmail,
         to,
         subject,
         html,
       });
 
-      if (error) {
-        this.logger.error('Failed to send generic email', error);
-        return { success: false, error };
-      }
-
-      this.logger.log(`Generic email sent to ${to}`);
-      return { success: true, data };
+      this.logger.log(`Generic email sent to ${to}: ${info.messageId}`);
+      return { success: true, data: info };
     } catch (error) {
       this.logger.error('Error sending generic email', error);
       return { success: false, error };
