@@ -808,42 +808,15 @@ export class TasksService {
       throw new BadRequestException('Cannot accept a rejected bid');
     }
 
-    // Check for existing pending payment - allow retry
+    // Check for existing pending payment - delete and recreate for retry
     const existingPayment = await this.paymentRepo.findOne({
       taskBid,
       status: PaymentStatus.PENDING,
     });
 
     if (existingPayment) {
-      // Re-initialize Paystack for retry
-      const paystackResponse = await this.paystackService.initializeTransaction({
-        email: currentUser.email,
-        amount: Math.round(existingPayment.totalAmount * 100), // Convert to kobo
-        reference: existingPayment.paymentReference,
-        callback_url: `${process.env.FRONTEND_URL}/payment/callback?reference=${existingPayment.paymentReference}`,
-        metadata: {
-          taskId: task.id,
-          taskPublicId: task.publicId,
-          bidId: taskBid.id,
-          userId: currentUser.id,
-          bidAmount: existingPayment.bidAmount,
-          serviceCharge: existingPayment.serviceCharge,
-        },
-      });
-
-      return {
-        message: 'Payment re-initialized successfully',
-        payment: {
-          id: existingPayment.id,
-          bidAmount: existingPayment.bidAmount,
-          serviceCharge: existingPayment.serviceCharge,
-          totalAmount: existingPayment.totalAmount,
-          paymentReference: existingPayment.paymentReference,
-          status: existingPayment.status,
-        },
-        paymentUrl: paystackResponse.data.authorization_url,
-        accessCode: paystackResponse.data.access_code,
-      };
+      // Delete old pending payment and create new one with fresh reference
+      await this.em.removeAndFlush(existingPayment);
     }
 
     // Get service charge settings
