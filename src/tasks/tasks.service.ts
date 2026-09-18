@@ -808,6 +808,44 @@ export class TasksService {
       throw new BadRequestException('Cannot accept a rejected bid');
     }
 
+    // Check for existing pending payment - allow retry
+    const existingPayment = await this.paymentRepo.findOne({
+      taskBid,
+      status: PaymentStatus.PENDING,
+    });
+
+    if (existingPayment) {
+      // Re-initialize Paystack for retry
+      const paystackResponse = await this.paystackService.initializeTransaction({
+        email: currentUser.email,
+        amount: Math.round(existingPayment.totalAmount * 100), // Convert to kobo
+        reference: existingPayment.paymentReference,
+        callback_url: `${process.env.FRONTEND_URL}/payment/callback?reference=${existingPayment.paymentReference}`,
+        metadata: {
+          taskId: task.id,
+          taskPublicId: task.publicId,
+          bidId: taskBid.id,
+          userId: currentUser.id,
+          bidAmount: existingPayment.bidAmount,
+          serviceCharge: existingPayment.serviceCharge,
+        },
+      });
+
+      return {
+        message: 'Payment re-initialized successfully',
+        payment: {
+          id: existingPayment.id,
+          bidAmount: existingPayment.bidAmount,
+          serviceCharge: existingPayment.serviceCharge,
+          totalAmount: existingPayment.totalAmount,
+          paymentReference: existingPayment.paymentReference,
+          status: existingPayment.status,
+        },
+        paymentUrl: paystackResponse.data.authorization_url,
+        accessCode: paystackResponse.data.access_code,
+      };
+    }
+
     // Get service charge settings
     const serviceChargePercentageSetting = await this.systemSettingsRepo.findOne({
       key: 'service_charge_percentage',
@@ -847,10 +885,8 @@ export class TasksService {
       status: PaymentStatus.PENDING,
     });
 
-    // Update task status to AWAITING_PAYMENT
-    task.status = TaskStatusEnum.AWAITING_PAYMENT;
-
-    await this.em.persistAndFlush([payment, task]);
+    // Don't change task status yet - only update after payment verification
+    await this.em.persistAndFlush(payment);
 
     // Initialize Paystack transaction
     const paystackResponse = await this.paystackService.initializeTransaction({

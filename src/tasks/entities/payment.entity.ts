@@ -13,10 +13,10 @@ export class Payment {
   @PrimaryKey()
   id!: number;
 
-  @ManyToOne(() => TaskBid)
+  @ManyToOne(() => TaskBid, { eager: false })
   taskBid!: TaskBid;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { eager: false })
   paidBy!: User;
 
   @Property({ columnType: 'decimal(10,2)' })
