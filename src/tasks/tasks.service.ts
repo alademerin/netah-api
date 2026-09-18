@@ -206,7 +206,7 @@ export class TasksService {
     return task;
   }
 
-  async findOneByUuid(publicId: string, currentUser?: User): Promise<any> {
+  async findOneByUuid(publicId: string, currentUser: User): Promise<any> {
     const task = await this.taskRepo.findOne(
       { publicId },
       {
@@ -220,10 +220,6 @@ export class TasksService {
 
     // If task is assigned, only poster and assignedTo can view
     if (task.assignedTo) {
-      if (!currentUser) {
-        throw new UnauthorizedException('Task not available');
-      }
-
       const isPoster = task.postedBy.id === currentUser.id;
       const isAssignee = task.assignedTo.id === currentUser.id;
 

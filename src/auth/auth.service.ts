@@ -86,8 +86,10 @@ export class AuthService {
 
   async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
     const user = await this.usersService.findOneByEmailWithPassword(forgotPasswordDto.email);
+
+    // Always return success message to prevent email enumeration
     if (!user) {
-      throw new BadRequestException('User with this email does not exist');
+      return { message: 'If an account exists with this email, you will receive a password reset code' };
     }
 
     const otp = this.generateOtp();
@@ -99,7 +101,7 @@ export class AuthService {
 
     await this.emailService.sendPasswordResetOtp(user.email, otp, user.firstName);
 
-    return { message: 'OTP sent to your email' };
+    return { message: 'If an account exists with this email, you will receive a password reset code' };
   }
 
   async verifyOtp(verifyOtpDto: VerifyOtpDto) {

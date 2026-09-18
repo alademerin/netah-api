@@ -27,6 +27,9 @@ export class EmailService {
         user: smtpUser,
         pass: smtpPass,
       },
+      tls: {
+        rejectUnauthorized: false, // Allow self-signed certs in dev
+      },
     });
 
     this.fromEmail = this.configService.get<string>('SMTP_FROM_EMAIL') || 'noreply@example.com';

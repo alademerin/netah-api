@@ -79,9 +79,9 @@ export class TasksController {
     return this.tasksService.remove(+id);
   }
 
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Get(':id')
-  findOneByUuid(@Param('id') id: string, @CurrentUser() currentUser?: User): Promise<any> {
+  findOneByUuid(@Param('id') id: string, @CurrentUser() currentUser: User): Promise<any> {
     return this.tasksService.findOneByUuid(id, currentUser);
   }
 
