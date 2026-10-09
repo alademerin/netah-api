@@ -20,7 +20,8 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "mikro-orm": "mikro-orm",
     "migration:create": "mikro-orm migration:create",
-    "migration:up": "mikro-orm migration:up"
+    "migration:up": "mikro-orm migration:up",
+    "db:seed": "mikro-orm seeder:run"
   },
   "dependencies": {
     "@mikro-orm/core": "^6.6.3",
@@ -44,8 +45,10 @@
     "passport-jwt": "^4.0.1",
     "paystack-api": "^2.0.6",
     "pg": "^8.16.3",
+    "qrcode": "^1.5.4",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "speakeasy": "^2.0.0",
     "swagger-ui-express": "^5.0.1",
     "uuid": "^13.0.0"
   },
@@ -54,6 +57,7 @@
     "@eslint/js": "^9.18.0",
     "@mikro-orm/cli": "^6.6.3",
     "@mikro-orm/migrations": "^6.6.3",
+    "@mikro-orm/seeder": "^6.6.3",
     "@nestjs/cli": "^11.0.0",
     "@nestjs/schematics": "^11.0.0",
     "@nestjs/testing": "^11.0.1",
@@ -66,6 +70,8 @@
     "@types/node": "^22.10.7",
     "@types/nodemailer": "^8.0.2",
     "@types/passport-jwt": "^4.0.1",
+    "@types/qrcode": "^1.5.6",
+    "@types/speakeasy": "^2.0.10",
     "@types/supertest": "^6.0.2",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",

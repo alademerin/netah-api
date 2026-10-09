@@ -61,6 +61,19 @@ export class User {
   @Property()
   registeredAs?: string;
 
+  @Property({ default: 'user' })
+  role?: 'user' | 'admin' = 'user';
+
+  @Property({ default: false })
+  mustChangePassword?: boolean = false;
+
+  @Property({ nullable: true })
+  @Exclude()
+  twoFactorSecret?: string;
+
+  @Property({ default: false })
+  twoFactorEnabled?: boolean = false;
+
   // Notification Channels
   @Property({ default: true })
   emailNotifications?: boolean = true;

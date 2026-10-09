@@ -1425,4 +1425,66 @@ export class TasksService {
       message: 'Image deleted successfully',
     };
   }
+
+  // Admin methods
+  async adminFindAllTasks() {
+    const tasks = await this.taskRepo.findAll({
+      populate: ['postedBy', 'category', 'assignedTo'],
+      orderBy: { createdAt: 'DESC' },
+    });
+    return tasks;
+  }
+
+  async adminFindTaskById(publicId: string) {
+    const task = await this.taskRepo.findOne(
+      { publicId },
+      { populate: ['postedBy', 'category', 'assignedTo'] },
+    );
+    if (!task) throw new NotFoundException('Task not found');
+    return task;
+  }
+
+  async adminGetTaskBids(publicId: string) {
+    const task = await this.taskRepo.findOne({ publicId });
+    if (!task) throw new NotFoundException('Task not found');
+
+    const bids = await this.taskBidRepo.find(
+      { task },
+      { populate: ['createdBy'], orderBy: { createdAt: 'DESC' } },
+    );
+    return bids;
+  }
+
+  async adminUpdateTask(publicId: string, updateTaskDto: UpdateTaskDto) {
+    const task = await this.taskRepo.findOne({ publicId });
+    if (!task) throw new NotFoundException('Task not found');
+
+    Object.assign(task, updateTaskDto);
+    await this.em.flush();
+    return task;
+  }
+
+  async adminDeleteTask(publicId: string) {
+    const task = await this.taskRepo.findOne({ publicId });
+    if (!task) throw new NotFoundException('Task not found');
+
+    await this.em.removeAndFlush(task);
+    return { message: 'Task deleted successfully' };
+  }
+
+  async adminGetTaskStats() {
+    const totalTasks = await this.taskRepo.count();
+    const openTasks = await this.taskRepo.count({ status: TaskStatusEnum.OPEN });
+    const inProgressTasks = await this.taskRepo.count({ status: TaskStatusEnum.IN_PROGRESS });
+    const completedTasks = await this.taskRepo.count({ status: TaskStatusEnum.COMPLETED });
+    const disputedTasks = await this.taskRepo.count({ status: TaskStatusEnum.DISPUTED });
+
+    return {
+      totalTasks,
+      openTasks,
+      inProgressTasks,
+      completedTasks,
+      disputedTasks,
+    };
+  }
 }

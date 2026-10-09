@@ -11,6 +11,13 @@ export default defineConfig({
     path: 'dist/migrations',
     pathTs: 'src/migrations',
   },
+  seeder: {
+    path: 'dist/seeders',
+    pathTs: 'src/seeders',
+    defaultSeeder: 'DatabaseSeeder',
+    glob: '!(*.d).{js,ts}',
+    emit: 'ts',
+  },
   pool: { min: 1, max: 5 },
   driverOptions: {
     connection: {

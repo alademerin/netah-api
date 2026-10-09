@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TasksService } from './tasks.service';
 import { TasksController } from './tasks.controller';
+import { AdminTasksController } from './admin-tasks.controller';
+import { AdminPaymentsController } from './admin-payments.controller';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
 import { TaskCategory } from './entities/task-category.entity';
 import { Task } from './entities/task.entity';
@@ -19,7 +21,7 @@ import { PaystackService } from './paystack.service';
     NotificationsModule,
     CloudinaryModule,
   ],
-  controllers: [TasksController],
+  controllers: [TasksController, AdminTasksController, AdminPaymentsController],
   providers: [TasksService, PaystackService],
 })
 export class TasksModule {}

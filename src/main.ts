@@ -1,16 +1,11 @@
 import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import {
-  ClassSerializerInterceptor,
-  Logger,
-  ValidationPipe,
-} from '@nestjs/common';
+import { ClassSerializerInterceptor, Logger, ValidationPipe } from '@nestjs/common';
 import * as cookieParser from 'cookie-parser';
 import { ResponseInterceptor } from './response/response.interceptor';
 
 async function bootstrap() {
-  console.log('FEL', process.env.FRONTEND_URL);
   const app = await NestFactory.create(AppModule);
 
   app.useLogger(new Logger());
@@ -18,10 +13,10 @@ async function bootstrap() {
   app.use(cookieParser());
 
   app.enableCors({
-    origin: process.env.FRONTEND_URL, // e.g. http://localhost:9001
+    origin: [process.env.FRONTEND_URL, process.env.ADMIN_URL], 
     credentials: true, // 👈 allow cookies
     allowedHeaders: ['Content-Type', 'Authorization'], // Allow Authorization header
-    exposedHeaders: ['Set-Cookie'], // Expose Set-Cookie for clients
+    exposedHeaders: ['Set-Cookie'], 
   });
 
   const reflector = app.get(Reflector);

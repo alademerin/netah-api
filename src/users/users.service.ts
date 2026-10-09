@@ -68,4 +68,33 @@ export class UsersService {
     user.deletedAt = new Date();
     await this.em.flush();
   }
+
+  // Admin methods
+  async adminFindAllUsers() {
+    const users = await this.userRepo.findAll({
+      orderBy: { createdAt: 'DESC' },
+    });
+    return users;
+  }
+
+  async adminGetUserStats() {
+    const totalUsers = await this.userRepo.count();
+    const adminUsers = await this.userRepo.count({ role: 'admin' });
+    const regularUsers = await this.userRepo.count({ role: 'user' });
+
+    return {
+      totalUsers,
+      adminUsers,
+      regularUsers,
+    };
+  }
+
+  async adminGetUserTasks(userId: number) {
+    const user = await this.userRepo.findOne({ id: userId });
+    if (!user) throw new NotFoundException('User not found');
+
+    // This would need to be implemented with proper task relations
+    // For now, return empty array as placeholder
+    return [];
+  }
 }
