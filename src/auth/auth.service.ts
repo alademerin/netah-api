@@ -186,8 +186,8 @@ export class AuthService {
 
     res.cookie('admin_token', token, {
       httpOnly: true,
-      secure: true, // Required for SameSite=none
-      sameSite: 'none', // Allows cross-site cookies
+      secure: false,
+      sameSite: isProd ? 'none' : 'lax',
       maxAge: 1000 * 60 * 60 * 24 * 30, // 30 days
     });
 
@@ -380,8 +380,8 @@ export class AuthService {
 
     res.cookie('admin_token', token, {
       httpOnly: true,
-      secure: true, // Required for SameSite=none
-      sameSite: 'none', // Allows cross-site cookies
+      secure: false,
+      sameSite: isProd ? 'none' : 'lax',
       maxAge: 1000 * 60 * 60 * 24 * 30, // 30 days
     });
 
