@@ -43,8 +43,8 @@ export class AuthService {
 
     res.cookie('access_token', token, {
       httpOnly: true,
-      secure: isProd,
-      sameSite: 'lax',
+      secure: false,
+      sameSite: isProd ? 'none' : 'lax',
       maxAge: 1000 * 60 * 60 * 24 * 30, // 30 days
     });
 
@@ -73,7 +73,7 @@ export class AuthService {
 
     res.cookie('access_token', token, {
       httpOnly: true,
-      secure: isProd,
+      secure: false,
       sameSite: isProd ? 'none' : 'lax',
       maxAge: 1000 * 60 * 60 * 24 * 30, // 30 days
     });
