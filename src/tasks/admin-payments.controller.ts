@@ -8,11 +8,12 @@ import { TasksService } from './tasks.service';
 import { ResponseMessage } from 'src/response/response.decorator';
 import { AdminJwtAuthGuard } from 'src/auth/guards/admin-jwt-auth.guard';
 import { MustChangePasswordGuard } from 'src/auth/guards/must-change-password.guard';
+import { Must2FAGuard } from 'src/auth/guards/must-2fa.guard';
 import { InjectRepository } from '@mikro-orm/nestjs';
 import { EntityRepository } from '@mikro-orm/postgresql';
 import { Payment, PaymentStatus } from './entities/payment.entity';
 
-@UseGuards(AdminJwtAuthGuard, MustChangePasswordGuard)
+@UseGuards(AdminJwtAuthGuard, MustChangePasswordGuard, Must2FAGuard)
 @Controller('admin/payments')
 export class AdminPaymentsController {
   constructor(

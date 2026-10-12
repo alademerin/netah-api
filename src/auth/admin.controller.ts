@@ -5,10 +5,12 @@ import { AdminLoginDto } from './dto/admin-login.dto';
 import { AdminLogin2FADto } from './dto/admin-login-2fa.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { Verify2FADto } from './dto/verify-2fa.dto';
+import { Verify2FALoginDto } from './dto/verify-2fa-login.dto';
 import { ResponseMessage } from 'src/response/response.decorator';
 import { Response } from 'express';
 import { AdminJwtAuthGuard } from './guards/admin-jwt-auth.guard';
 import { MustChangePasswordGuard } from './guards/must-change-password.guard';
+import { Must2FAGuard } from './guards/must-2fa.guard';
 import { CurrentUser } from './decorators/current-user-decorator';
 import { User } from 'src/users/entities/user.entity';
 
@@ -17,7 +19,7 @@ export class AdminController {
   constructor(private readonly authService: AuthService) {}
 
   @ResponseMessage('Admin created successfully!')
-  @UseGuards(AdminJwtAuthGuard, MustChangePasswordGuard)
+  @UseGuards(AdminJwtAuthGuard, MustChangePasswordGuard, Must2FAGuard)
   @Post('create')
   createAdmin(
     @Body() createAdminDto: CreateAdminDto,
@@ -29,10 +31,19 @@ export class AdminController {
   @ResponseMessage('Admin login successful!')
   @Post('login')
   adminLogin(
-    @Body() adminLogin2FADto: AdminLogin2FADto,
+    @Body() adminLoginDto: AdminLoginDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    return this.authService.adminLogin2FA(adminLogin2FADto, res);
+    return this.authService.adminLogin2FA(adminLoginDto, res);
+  }
+
+  @ResponseMessage('2FA verification successful!')
+  @Post('2fa/verify-login')
+  verify2FALogin(
+    @Body() verify2FALoginDto: Verify2FALoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.authService.verify2FALogin(verify2FALoginDto.pendingToken, verify2FALoginDto.code, res);
   }
 
   @ResponseMessage('Password changed successfully!')
@@ -60,7 +71,7 @@ export class AdminController {
   }
 
   @ResponseMessage('2FA disabled successfully!')
-  @UseGuards(AdminJwtAuthGuard)
+  @UseGuards(AdminJwtAuthGuard, Must2FAGuard)
   @Post('2fa/disable')
   disable2FA(@CurrentUser() user: User, @Body() verify2FADto: Verify2FADto) {
     return this.authService.disable2FA(user, verify2FADto);

@@ -338,36 +338,34 @@ export class AuthService {
     return { message: '2FA disabled successfully' };
   }
 
-  async adminLogin2FA(adminLogin2FADto: AdminLogin2FADto, res: Response) {
-    const admin = await this.usersService.findOneByEmailWithPassword(adminLogin2FADto.email);
+  async adminLogin2FA(adminLoginDto: AdminLoginDto, res: Response) {
+    const admin = await this.usersService.findOneByEmailWithPassword(adminLoginDto.email);
 
     if (!admin || admin.role !== 'admin') {
       throw new UnauthorizedException('Invalid Credentials');
     }
 
-    const passwordMatch = await bcrypt.compare(adminLogin2FADto.password, admin.password);
+    const passwordMatch = await bcrypt.compare(adminLoginDto.password, admin.password);
     if (!passwordMatch) throw new UnauthorizedException('Invalid Credentials');
 
     // Check if 2FA is enabled
     if (admin.twoFactorEnabled) {
-      if (!adminLogin2FADto.twoFactorCode) {
-        return {
-          requires2FA: true,
-          message: '2FA code required',
-        };
-      }
+      // Issue temporary pending token for 2FA verification
+      const pendingPayload = {
+        sub: admin.id,
+        email: admin.email,
+        pending2FA: true,
+      };
 
-      // Verify 2FA code
-      const isValid = speakeasy.totp.verify({
-        secret: admin.twoFactorSecret!,
-        encoding: 'base32',
-        token: adminLogin2FADto.twoFactorCode,
-        window: 2,
+      const pendingToken = this.jwtService.sign(pendingPayload, {
+        expiresIn: '5m', // 5 minutes to complete 2FA
       });
 
-      if (!isValid) {
-        throw new UnauthorizedException('Invalid 2FA code');
-      }
+      return {
+        requires2FA: true,
+        pendingToken,
+        message: '2FA code required',
+      };
     }
 
     const payload = {
@@ -388,7 +386,61 @@ export class AuthService {
     return {
       access_token: token,
       mustChangePassword: admin.mustChangePassword || false,
-      twoFactorEnabled: admin.twoFactorEnabled || false,
+      twoFactorEnabled: false,
+    };
+  }
+
+  async verify2FALogin(pendingToken: string, code: string, res: Response) {
+    // Verify pending token
+    let payload: any;
+    try {
+      payload = this.jwtService.verify(pendingToken);
+    } catch (error) {
+      throw new UnauthorizedException('Invalid or expired session. Please login again.');
+    }
+
+    if (!payload.pending2FA) {
+      throw new UnauthorizedException('Invalid session token');
+    }
+
+    const admin = await this.usersService.findOneByEmailWithPassword(payload.email);
+
+    if (!admin || admin.role !== 'admin' || !admin.twoFactorEnabled) {
+      throw new UnauthorizedException('Invalid session');
+    }
+
+    // Verify 2FA code
+    const isValid = speakeasy.totp.verify({
+      secret: admin.twoFactorSecret!,
+      encoding: 'base32',
+      token: code,
+      window: 2,
+    });
+
+    if (!isValid) {
+      throw new UnauthorizedException('Invalid 2FA code');
+    }
+
+    // Issue real admin token
+    const finalPayload = {
+      sub: admin.id,
+      email: admin.email,
+    };
+
+    const token = this.jwtService.sign(finalPayload);
+    const isProd = process.env.NODE_ENV === 'production';
+
+    res.cookie('admin_token', token, {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
+      maxAge: 1000 * 60 * 60 * 24 * 30, // 30 days
+    });
+
+    return {
+      access_token: token,
+      mustChangePassword: admin.mustChangePassword || false,
+      twoFactorEnabled: true,
     };
   }
 }

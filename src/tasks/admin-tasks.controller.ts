@@ -11,9 +11,10 @@ import { TasksService } from './tasks.service';
 import { ResponseMessage } from 'src/response/response.decorator';
 import { AdminJwtAuthGuard } from 'src/auth/guards/admin-jwt-auth.guard';
 import { MustChangePasswordGuard } from 'src/auth/guards/must-change-password.guard';
+import { Must2FAGuard } from 'src/auth/guards/must-2fa.guard';
 import { UpdateTaskDto } from './dto/update-task.dto';
 
-@UseGuards(AdminJwtAuthGuard, MustChangePasswordGuard)
+@UseGuards(AdminJwtAuthGuard, MustChangePasswordGuard, Must2FAGuard)
 @Controller('admin/tasks')
 export class AdminTasksController {
   constructor(private readonly tasksService: TasksService) {}
