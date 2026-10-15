@@ -4,6 +4,7 @@ import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
 import { UsersModule } from './users/users.module';
+import { AdminsModule } from './admins/admins.module';
 import { AuthModule } from './auth/auth.module';
 import { TasksModule } from './tasks/tasks.module';
 import { NotificationsModule } from './notifications/notifications.module';
@@ -18,6 +19,7 @@ import { EmailModule } from './email/email.module';
     }),
     MikroOrmModule.forRoot(),
     UsersModule,
+    AdminsModule,
     AuthModule,
     TasksModule,
     NotificationsModule,

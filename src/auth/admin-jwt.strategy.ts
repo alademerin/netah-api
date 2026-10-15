@@ -3,13 +3,13 @@ import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { adminCookieExtractor } from './utils/admin-cookie-extractor';
-import { UsersService } from 'src/users/users.service';
+import { AdminsService } from 'src/admins/admins.service';
 
 @Injectable()
 export class AdminJwtStrategy extends PassportStrategy(Strategy, 'admin-jwt') {
   constructor(
     configService: ConfigService,
-    private usersService: UsersService,
+    private adminsService: AdminsService,
   ) {
     super({
       jwtFromRequest: adminCookieExtractor,
@@ -19,14 +19,13 @@ export class AdminJwtStrategy extends PassportStrategy(Strategy, 'admin-jwt') {
 
   async validate(payload: any) {
     try {
-      const user = await this.usersService.findOne(payload.sub);
+      const admin = await this.adminsService.findOne(payload.sub);
 
-      // Ensure user is admin
-      if (!user || user.role !== 'admin') {
+      if (!admin) {
         throw new UnauthorizedException('Admin access required');
       }
 
-      return user;
+      return admin;
     } catch (error) {
       throw new UnauthorizedException('Invalid admin credentials');
     }

@@ -79,13 +79,9 @@ export class UsersService {
 
   async adminGetUserStats() {
     const totalUsers = await this.userRepo.count();
-    const adminUsers = await this.userRepo.count({ role: 'admin' });
-    const regularUsers = await this.userRepo.count({ role: 'user' });
 
     return {
       totalUsers,
-      adminUsers,
-      regularUsers,
     };
   }
 

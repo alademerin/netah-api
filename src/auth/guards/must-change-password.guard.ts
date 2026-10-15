@@ -10,15 +10,14 @@ export class MustChangePasswordGuard implements CanActivate {
     context: ExecutionContext,
   ): boolean | Promise<boolean> | Observable<boolean> {
     const request = context.switchToHttp().getRequest();
-    const user = request.user;
+    const admin = request.user;
 
-    // Only apply to admins
-    if (!user || user.role !== 'admin') {
+    if (!admin) {
       return true;
     }
 
     // If admin must change password, block access
-    if (user.mustChangePassword === true) {
+    if (admin.mustChangePassword === true) {
       throw new ForbiddenException(
         'You must change your password before accessing this resource. Please use the change-password endpoint.',
       );

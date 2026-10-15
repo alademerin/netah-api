@@ -1,6 +1,6 @@
 import { EntityManager } from '@mikro-orm/core';
 import { Seeder } from '@mikro-orm/seeder';
-import { User } from '../users/entities/user.entity';
+import { Admin } from '../admins/entities/admin.entity';
 
 export class AdminSeeder extends Seeder {
   async run(em: EntityManager): Promise<void> {
@@ -16,7 +16,7 @@ export class AdminSeeder extends Seeder {
     }
 
     // Check if admin already exists
-    const existingAdmin = await em.findOne(User, {
+    const existingAdmin = await em.findOne(Admin, {
       email: adminEmail,
     });
 
@@ -26,14 +26,12 @@ export class AdminSeeder extends Seeder {
     }
 
     // Create admin user
-    const admin = em.create(User, {
+    const admin = em.create(Admin, {
       email: adminEmail,
       firstName: adminFirstName,
       lastName: adminLastName,
       phoneNumber: adminPhone,
       password: adminPassword,
-      role: 'admin',
-      registeredAs: 'admin',
       mustChangePassword: true,
     });
 
